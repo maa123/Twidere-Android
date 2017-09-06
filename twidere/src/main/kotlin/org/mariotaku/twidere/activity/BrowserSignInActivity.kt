@@ -36,6 +36,8 @@ import org.attoparser.ParseException
 import org.mariotaku.ktextension.dismissDialogFragment
 import org.mariotaku.twidere.R
 import org.mariotaku.twidere.TwidereConstants.*
+import org.mariotaku.twidere.extension.applyDefault
+import org.mariotaku.twidere.extension.onShow
 import org.mariotaku.twidere.fragment.BaseDialogFragment
 import org.mariotaku.twidere.util.OAuthPasswordAuthenticator
 import org.mariotaku.twidere.util.webkit.DefaultWebViewClient
@@ -59,13 +61,14 @@ class BrowserSignInActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_browser_sign_in)
-        webView.setWebChromeClient(AuthorizationWebChromeClient(this))
-        webView.setWebViewClient(AuthorizationWebViewClient(this))
+        webView.webChromeClient = AuthorizationWebChromeClient(this)
+        webView.webViewClient = AuthorizationWebViewClient(this)
         webView.isVerticalScrollBarEnabled = false
         webView.addJavascriptInterface(InjectorJavaScriptInterface(this), "injector")
-        val webSettings = webView.settings
-        webSettings.applyDefault()
-        webSettings.setSupportMultipleWindows(true)
+        webView.settings.apply {
+            applyDefault()
+            setSupportMultipleWindows(true)
+        }
 
         webView.loadUrl(intent.dataString)
     }
@@ -225,44 +228,43 @@ class BrowserSignInActivity : BaseActivity() {
         }
 
         override fun onPause() {
-            val webView = view?.findViewById(R.id.webView) as? WebView
+            val webView: WebView? = view?.findViewById(R.id.webView)
             webView?.onPause()
             super.onPause()
         }
 
         override fun onResume() {
             super.onResume()
-            val webView = view?.findViewById(R.id.webView) as? WebView
+            val webView: WebView? = view?.findViewById(R.id.webView)
             webView?.onResume()
         }
 
         override fun onDestroy() {
-            val webView = view?.findViewById(R.id.webView) as? WebView
+            val webView: WebView? = view?.findViewById(R.id.webView)
             webView?.destroy()
             super.onDestroy()
         }
 
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-            val webView = view.findViewById(R.id.webView) as WebView
+            val webView: WebView = view.findViewById(R.id.webView)
             val webSettings = webView.settings
             webSettings.applyDefault()
-            webView.setWebViewClient(object : WebViewClient() {
+            webView.webViewClient = object : WebViewClient() {
                 @Suppress("OverridingDeprecatedMember")
-                override fun shouldOverrideUrlLoading(view: WebView?, url: String?) = false
+                override fun shouldOverrideUrlLoading(wv: WebView?, url: String?) = false
 
-                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?) = false
-            })
-            webView.setWebChromeClient(object : WebChromeClient() {
+                override fun shouldOverrideUrlLoading(wv: WebView?, request: WebResourceRequest?) = false
+            }
+            webView.webChromeClient = object : WebChromeClient() {
                 override fun onCloseWindow(window: WebView) {
                     dismiss()
                 }
-            })
+            }
         }
 
         override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
             val dialog = super.onCreateDialog(savedInstanceState)
-            dialog.setOnShowListener {
-                it as Dialog
+            dialog.onShow {
                 it.window.attributes = it.window.attributes?.apply {
                     width = WindowManager.LayoutParams.MATCH_PARENT
                 }
@@ -270,9 +272,9 @@ class BrowserSignInActivity : BaseActivity() {
                 val msg = this.msg
                 val transport = msg?.obj as? WebView.WebViewTransport ?: run {
                     dismiss()
-                    return@setOnShowListener
+                    return@onShow
                 }
-                transport.webView = it.findViewById(R.id.webView) as WebView
+                transport.webView = it.findViewById<WebView>(R.id.webView)
                 msg.sendToTarget()
             }
             return dialog
@@ -284,12 +286,5 @@ class BrowserSignInActivity : BaseActivity() {
         private const val INJECT_CONTENT = "javascript:window.injector.processHTML('<head>'+document.getElementsByTagName('html')[0].innerHTML+'</head>');"
         private const val TAG_BROWSER_WINDOW = "browser_window"
 
-        @SuppressLint("SetJavaScriptEnabled")
-        private fun WebSettings.applyDefault() {
-            loadsImagesAutomatically = true
-            javaScriptEnabled = true
-            blockNetworkImage = false
-            saveFormData = true
-        }
     }
 }

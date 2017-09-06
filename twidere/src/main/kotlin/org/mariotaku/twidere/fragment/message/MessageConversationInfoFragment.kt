@@ -42,7 +42,6 @@ import android.support.v7.widget.Toolbar
 import android.view.*
 import android.widget.CompoundButton
 import android.widget.EditText
-import com.bumptech.glide.Glide
 import com.bumptech.glide.RequestManager
 import kotlinx.android.synthetic.main.activity_home_content.view.*
 import kotlinx.android.synthetic.main.fragment_messages_conversation_info.*
@@ -71,6 +70,7 @@ import org.mariotaku.twidere.activity.UserSelectorActivity
 import org.mariotaku.twidere.adapter.BaseRecyclerViewAdapter
 import org.mariotaku.twidere.adapter.iface.IItemCountsAdapter
 import org.mariotaku.twidere.annotation.AccountType
+import org.mariotaku.twidere.annotation.ImageShapeStyle
 import org.mariotaku.twidere.annotation.ProfileImageSize
 import org.mariotaku.twidere.constant.IntentConstants
 import org.mariotaku.twidere.constant.IntentConstants.*
@@ -81,6 +81,7 @@ import org.mariotaku.twidere.extension.applyTheme
 import org.mariotaku.twidere.extension.getDirectMessageMaxParticipants
 import org.mariotaku.twidere.extension.loadProfileImage
 import org.mariotaku.twidere.extension.model.*
+import org.mariotaku.twidere.extension.onShow
 import org.mariotaku.twidere.extension.view.calculateSpaceItemHeight
 import org.mariotaku.twidere.fragment.BaseDialogFragment
 import org.mariotaku.twidere.fragment.BaseFragment
@@ -131,7 +132,7 @@ class MessageConversationInfoFragment : BaseFragment(), IToolBarSupportFragment,
         }
         val theme = Chameleon.getOverrideTheme(context, activity)
 
-        adapter = ConversationInfoAdapter(context, Glide.with(this))
+        adapter = ConversationInfoAdapter(context, requestManager)
         adapter.listener = object : ConversationInfoAdapter.Listener {
             override fun onUserClick(position: Int) {
                 val user = adapter.getUser(position) ?: return
@@ -163,6 +164,9 @@ class MessageConversationInfoFragment : BaseFragment(), IToolBarSupportFragment,
         val profileImageStyle = preferences[profileImageStyleKey]
         appBarIcon.style = profileImageStyle
         conversationAvatar.style = profileImageStyle
+
+        toolbarLayout.setStatusBarScrimColor(theme.statusBarColor)
+        coordinatorLayout.setStatusBarBackgroundColor(theme.statusBarColor)
 
         val avatarBackground = ChameleonUtils.getColorDependent(theme.colorToolbar)
         appBarIcon.setShapeBackground(avatarBackground)
@@ -213,6 +217,10 @@ class MessageConversationInfoFragment : BaseFragment(), IToolBarSupportFragment,
         inflater.inflate(R.menu.menu_messages_conversation_info, menu)
     }
 
+    override fun onApplySystemWindowInsets(insets: Rect) {
+        // No-op
+    }
+
     override fun onPrepareOptionsMenu(menu: Menu) {
         menu.setItemAvailability(R.id.clear_messages, true)
         if (adapter.conversation?.conversation_extras_type == ExtrasType.TWITTER_OFFICIAL) {
@@ -258,10 +266,10 @@ class MessageConversationInfoFragment : BaseFragment(), IToolBarSupportFragment,
         val name = data.getTitle(context, userColorNameManager, preferences[nameFirstKey]).first
         val summary = data.getSubtitle(context)
 
-        val requestManager = Glide.with(this)
-        val profileImageStyle = preferences[profileImageStyleKey]
+        @ImageShapeStyle val profileImageStyle = preferences[profileImageStyleKey]
         requestManager.loadProfileImage(context, data, profileImageStyle).into(conversationAvatar)
-        requestManager.loadProfileImage(context, data, profileImageStyle, size = ProfileImageSize.REASONABLY_SMALL).into(appBarIcon)
+        requestManager.loadProfileImage(context, data, profileImageStyle, 0f,
+                0f, ProfileImageSize.REASONABLY_SMALL).into(appBarIcon)
         appBarTitle.spannable = name
         conversationTitle.spannable = name
         if (summary != null) {
@@ -285,7 +293,7 @@ class MessageConversationInfoFragment : BaseFragment(), IToolBarSupportFragment,
 
         adapter.conversation = data
 
-        activity?.supportInvalidateOptionsMenu()
+        activity?.invalidateOptionsMenu()
     }
 
     private fun performDestroyConversation() {
@@ -654,7 +662,7 @@ class MessageConversationInfoFragment : BaseFragment(), IToolBarSupportFragment,
     internal class SpaceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
     internal class AddUserViewHolder(itemView: View, adapter: ConversationInfoAdapter) : RecyclerView.ViewHolder(itemView) {
 
-        private val itemContent = itemView.findViewById(R.id.itemContent)
+        private val itemContent = itemView.findViewById<View>(R.id.itemContent)
 
         init {
             itemContent.setOnClickListener {
@@ -668,9 +676,9 @@ class MessageConversationInfoFragment : BaseFragment(), IToolBarSupportFragment,
             itemView: View,
             adapter: ConversationInfoAdapter
     ) : SimpleUserViewHolder<ConversationInfoAdapter>(itemView, adapter) {
-        private val headerIcon = itemView.findViewById(R.id.headerIcon)
 
-        private val itemContent = itemView.findViewById(R.id.itemContent)
+        private val headerIcon = itemView.findViewById<View>(R.id.headerIcon)
+        private val itemContent = itemView.findViewById<View>(R.id.itemContent)
 
         init {
             itemContent.setOnClickListener {
@@ -732,10 +740,7 @@ class MessageConversationInfoFragment : BaseFragment(), IToolBarSupportFragment,
                 (parentFragment as MessageConversationInfoFragment).openEditAction(action.type)
             }
             val dialog = builder.create()
-            dialog.setOnShowListener {
-                it as AlertDialog
-                it.applyTheme()
-            }
+            dialog.onShow { it.applyTheme() }
             return dialog
         }
 
@@ -749,14 +754,11 @@ class MessageConversationInfoFragment : BaseFragment(), IToolBarSupportFragment,
             builder.setView(R.layout.dialog_edit_conversation_name)
             builder.setNegativeButton(android.R.string.cancel, null)
             builder.setPositiveButton(android.R.string.ok) { dialog, _ ->
-                val editName = (dialog as Dialog).findViewById(R.id.editName) as EditText
+                val editName = (dialog as Dialog).findViewById<EditText>(R.id.editName)
                 (parentFragment as MessageConversationInfoFragment).performSetConversationName(editName.text.toString())
             }
             val dialog = builder.create()
-            dialog.setOnShowListener {
-                it as AlertDialog
-                it.applyTheme()
-            }
+            dialog.onShow { it.applyTheme() }
             return dialog
         }
     }
@@ -771,10 +773,7 @@ class MessageConversationInfoFragment : BaseFragment(), IToolBarSupportFragment,
             }
             builder.setNegativeButton(android.R.string.cancel, null)
             val dialog = builder.create()
-            dialog.setOnShowListener {
-                it as AlertDialog
-                it.applyTheme()
-            }
+            dialog.onShow { it.applyTheme() }
             return dialog
         }
 
@@ -789,10 +788,7 @@ class MessageConversationInfoFragment : BaseFragment(), IToolBarSupportFragment,
             }
             builder.setNegativeButton(android.R.string.cancel, null)
             val dialog = builder.create()
-            dialog.setOnShowListener {
-                it as AlertDialog
-                it.applyTheme()
-            }
+            dialog.onShow { it.applyTheme() }
             return dialog
         }
 

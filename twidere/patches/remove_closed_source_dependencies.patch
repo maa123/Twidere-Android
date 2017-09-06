@@ -3,100 +3,50 @@ IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
---- twidere/build.gradle        (date 1493143158000)
-+++ twidere/build.gradle        (revision )
-@@ -7,23 +7,23 @@ apply plugin: 'kotlin-android-extensions'
- apply plugin: 'androidsvgdrawable'
+--- twidere/build.gradle	(date 1504708582000)
++++ twidere/build.gradle	(revision )
+@@ -20,7 +20,7 @@
+         }
  
- // START Non-FOSS component
--apply plugin: 'io.fabric'
--apply plugin: 'com.github.triplet.play'
-+//apply plugin: 'io.fabric'
-+//apply plugin: 'com.github.triplet.play'
- // END Non-FOSS component
- 
- buildscript {
-     repositories {
-         jcenter()
          // START Non-FOSS component
--        maven { url 'https://maven.fabric.io/public' }
-+//        maven { url 'https://maven.fabric.io/public' }
+-        classpath "com.google.gms:google-services:${pluginVersions['PlayServices']}"
++//        classpath "com.google.gms:google-services:${pluginVersions['PlayServices']}"
          // END Non-FOSS component
      }
- 
-     dependencies {
-         // START Non-FOSS component
--        classpath "io.fabric.tools:gradle:${libVersions['FabricPlugin']}"
--        classpath "com.github.triplet.gradle:play-publisher:${libVersions['PlayPublisher']}"
--        classpath 'com.google.gms:google-services:3.0.0'
-+//        classpath "io.fabric.tools:gradle:${libVersions['FabricPlugin']}"
-+//        classpath "com.github.triplet.gradle:play-publisher:${libVersions['PlayPublisher']}"
-+//        classpath 'com.google.gms:google-services:3.0.0'
-         // END Non-FOSS component
- 
-         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${libVersions['Kotlin']}"
-@@ -56,7 +56,7 @@ android {
+ }
+@@ -57,9 +57,9 @@
  
      productFlavors {
          // START Non-FOSS component
--        google {}
-+//        google {}
+-        google {
+-            dimension 'channel'
+-        }
++//        google {
++//            dimension 'channel'
++//        }
          // END Non-FOSS component
-         fdroid {}
-     }
-@@ -88,7 +88,7 @@ repositories {
-     mavenLocal()
-     maven { url 'https://s3.amazonaws.com/repo.commonsware.com' }
-     // START Non-FOSS component
--    maven { url 'https://maven.fabric.io/public' }
-+//    maven { url 'https://maven.fabric.io/public' }
-     // END Non-FOSS component
-     flatDir { dirs "$projectDir/lib" }
- }
-@@ -104,17 +104,17 @@ dependencies {
-     compile project(':twidere.component.nyan')
+         fdroid {
+             dimension 'channel'
+@@ -139,14 +139,14 @@
+     implementation project(':twidere.component.nyan')
  
      // START Non-FOSS component
--    googleCompile "com.google.android.gms:play-services-maps:${libVersions['PlayServices']}"
--    googleCompile "com.google.android.gms:play-services-auth:${libVersions['PlayServices']}"
--    googleCompile "com.google.maps.android:android-maps-utils:${libVersions['MapsUtils']}"
--    googleCompile("com.crashlytics.sdk.android:crashlytics:${libVersions['Crashlyrics']}@aar") {
--        transitive = true
--    }
--    googleCompile "com.anjlab.android.iab.v3:library:${libVersions['IABv3']}"
--    googleCompile "com.dropbox.core:dropbox-core-sdk:${libVersions['DropboxCoreSdk']}"
--    googleCompile("com.google.apis:google-api-services-drive:${libVersions['GoogleDriveApi']}") {
+-    googleImplementation "com.google.android.gms:play-services-maps:${libVersions['PlayServices']}"
+-    googleImplementation "com.google.android.gms:play-services-auth:${libVersions['PlayServices']}"
+-    googleImplementation "com.google.maps.android:android-maps-utils:${libVersions['MapsUtils']}"
+-    googleImplementation "com.anjlab.android.iab.v3:library:${libVersions['IABv3']}"
+-    googleImplementation "com.dropbox.core:dropbox-core-sdk:${libVersions['DropboxCoreSdk']}"
+-    googleImplementation("com.google.apis:google-api-services-drive:${libVersions['GoogleDriveApi']}") {
 -        exclude group: 'org.apache.httpcomponents'
 -    }
-+//    googleCompile "com.google.android.gms:play-services-maps:${libVersions['PlayServices']}"
-+//    googleCompile "com.google.android.gms:play-services-auth:${libVersions['PlayServices']}"
-+//    googleCompile "com.google.maps.android:android-maps-utils:${libVersions['MapsUtils']}"
-+//    googleCompile("com.crashlytics.sdk.android:crashlytics:${libVersions['Crashlyrics']}@aar") {
-+//        transitive = true
-+//    }
-+//    googleCompile "com.anjlab.android.iab.v3:library:${libVersions['IABv3']}"
-+//    googleCompile "com.dropbox.core:dropbox-core-sdk:${libVersions['DropboxCoreSdk']}"
-+//    googleCompile("com.google.apis:google-api-services-drive:${libVersions['GoogleDriveApi']}") {
++//    googleImplementation "com.google.android.gms:play-services-maps:${libVersions['PlayServices']}"
++//    googleImplementation "com.google.android.gms:play-services-auth:${libVersions['PlayServices']}"
++//    googleImplementation "com.google.maps.android:android-maps-utils:${libVersions['MapsUtils']}"
++//    googleImplementation "com.anjlab.android.iab.v3:library:${libVersions['IABv3']}"
++//    googleImplementation "com.dropbox.core:dropbox-core-sdk:${libVersions['DropboxCoreSdk']}"
++//    googleImplementation("com.google.apis:google-api-services-drive:${libVersions['GoogleDriveApi']}") {
 +//        exclude group: 'org.apache.httpcomponents'
 +//    }
      // END Non-FOSS component
  
-     fdroidCompile "org.osmdroid:osmdroid-android:${libVersions['OSMDroid']}"
-@@ -239,12 +239,12 @@ task svgToMipmap(type: SvgDrawableTask) {
- }
- 
- // START Non-FOSS component
--play {
--    jsonFile = rootProject.file('private/google_play_publish.json')
--    track = 'beta'
--}
-+//play {
-+//    jsonFile = rootProject.file('private/google_play_publish.json')
-+//    track = 'beta'
-+//}
- // END Non-FOSS component
- 
- // START Non-FOSS component
--apply plugin: 'com.google.gms.google-services'
-+//apply plugin: 'com.google.gms.google-services'
- // END Non-FOSS component
+     fdroidImplementation "org.osmdroid:osmdroid-android:${libVersions['OSMDroid']}"

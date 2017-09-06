@@ -44,6 +44,7 @@ import org.mariotaku.twidere.extension.applyTheme
 import org.mariotaku.twidere.extension.model.can_retweet
 import org.mariotaku.twidere.extension.model.is_my_retweet
 import org.mariotaku.twidere.extension.model.textLimit
+import org.mariotaku.twidere.extension.onShow
 import org.mariotaku.twidere.extension.withAppendedPath
 import org.mariotaku.twidere.fragment.BaseDialogFragment
 import org.mariotaku.twidere.model.*
@@ -65,11 +66,11 @@ class RetweetQuoteDialogFragment : AbsStatusDialogFragment() {
     override val Dialog.loadProgress: View get() = findViewById(R.id.loadProgress)
     override val Dialog.itemContent: View get() = findViewById(R.id.itemContent)
 
-    private val Dialog.textCountView get() = findViewById(R.id.commentTextCount) as StatusTextCountView
+    private val Dialog.textCountView: StatusTextCountView get() = findViewById(R.id.commentTextCount)
 
-    private val Dialog.commentContainer get() = findViewById(R.id.commentContainer) as RelativeLayout
-    private val Dialog.editComment get() = findViewById(R.id.editComment) as ComposeEditText
-    private val Dialog.quoteOriginal get() = findViewById(R.id.quoteOriginal) as CheckBox
+    private val Dialog.commentContainer: RelativeLayout get() = findViewById(R.id.commentContainer)
+    private val Dialog.editComment: ComposeEditText get() = findViewById(R.id.editComment)
+    private val Dialog.quoteOriginal: CheckBox get() = findViewById(R.id.quoteOriginal)
 
     private val text: String?
         get() = arguments.getString(EXTRA_TEXT)
@@ -118,7 +119,7 @@ class RetweetQuoteDialogFragment : AbsStatusDialogFragment() {
         }
 
         getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-            if (status.is_my_retweet) {
+            if (!shouldQuoteRetweet(account) && status.is_my_retweet) {
                 twitterWrapper.cancelRetweetAsync(account.key, status.id, status.my_retweet_id)
                 dismiss()
             } else if (retweetOrQuote(account, status, showProtectedConfirm)) {
@@ -184,6 +185,12 @@ class RetweetQuoteDialogFragment : AbsStatusDialogFragment() {
             positiveButton.isEnabled = status.can_retweet
         }
         textCountView.textCount = validator.getTweetLength(s.toString())
+    }
+
+    private fun DialogInterface.shouldQuoteRetweet(account: AccountDetails): Boolean {
+        if (this !is AlertDialog) return false
+        if (!canQuoteRetweet(account)) return false
+        return !editComment.empty
     }
 
     @CheckResult
@@ -310,10 +317,7 @@ class RetweetQuoteDialogFragment : AbsStatusDialogFragment() {
             builder.setPositiveButton(R.string.send_anyway, this)
             builder.setNegativeButton(android.R.string.cancel, null)
             val dialog = builder.create()
-            dialog.setOnShowListener {
-                it as AlertDialog
-                it.applyTheme()
-            }
+            dialog.onShow { it.applyTheme() }
             return dialog
         }
 

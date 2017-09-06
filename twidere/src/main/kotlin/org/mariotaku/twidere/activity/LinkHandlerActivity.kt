@@ -23,7 +23,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.graphics.Rect
 import android.net.Uri
 import android.os.BadParcelableException
 import android.os.Bundle
@@ -32,7 +31,9 @@ import android.support.v4.app.Fragment
 import android.support.v4.app.FragmentManager
 import android.support.v4.app.FragmentManager.FragmentLifecycleCallbacks
 import android.support.v4.app.NavUtils
+import android.support.v4.view.ViewCompat
 import android.support.v4.view.WindowCompat
+import android.support.v4.view.WindowInsetsCompat
 import android.support.v7.widget.Toolbar
 import android.text.TextUtils
 import android.view.KeyEvent
@@ -54,7 +55,7 @@ import org.mariotaku.twidere.fragment.filter.FiltersImportBlocksFragment
 import org.mariotaku.twidere.fragment.filter.FiltersImportMutesFragment
 import org.mariotaku.twidere.fragment.filter.FiltersSubscriptionsFragment
 import org.mariotaku.twidere.fragment.iface.IBaseFragment
-import org.mariotaku.twidere.fragment.iface.IBaseFragment.SystemWindowsInsetsCallback
+import org.mariotaku.twidere.fragment.iface.IBaseFragment.SystemWindowInsetsCallback
 import org.mariotaku.twidere.fragment.iface.IFloatingActionButtonFragment
 import org.mariotaku.twidere.fragment.iface.IToolBarSupportFragment
 import org.mariotaku.twidere.fragment.iface.SupportFragmentCallback
@@ -64,8 +65,10 @@ import org.mariotaku.twidere.fragment.message.MessagesConversationFragment
 import org.mariotaku.twidere.fragment.message.MessagesEntriesFragment
 import org.mariotaku.twidere.fragment.search.MastodonSearchFragment
 import org.mariotaku.twidere.fragment.search.SearchFragment
+import org.mariotaku.twidere.fragment.status.StatusFragment
 import org.mariotaku.twidere.fragment.statuses.*
 import org.mariotaku.twidere.fragment.users.*
+import org.mariotaku.twidere.graphic.ActionBarColorDrawable
 import org.mariotaku.twidere.graphic.EmptyDrawable
 import org.mariotaku.twidere.model.UserKey
 import org.mariotaku.twidere.model.analyzer.PurchaseFinished
@@ -74,7 +77,7 @@ import org.mariotaku.twidere.util.KeyboardShortcutsHandler.KeyboardShortcutCallb
 import org.mariotaku.twidere.util.linkhandler.TwidereLinkMatcher
 import org.mariotaku.twidere.util.theme.getCurrentThemeResource
 
-class LinkHandlerActivity : BaseActivity(), SystemWindowsInsetsCallback, IControlBarActivity,
+class LinkHandlerActivity : BaseActivity(), SystemWindowInsetsCallback, IControlBarActivity,
         SupportFragmentCallback {
 
     private lateinit var multiSelectHandler: MultiSelectEventHandler
@@ -95,7 +98,7 @@ class LinkHandlerActivity : BaseActivity(), SystemWindowsInsetsCallback, IContro
         multiSelectHandler.dispatchOnCreate()
 
         fragmentLifecycleCallbacks = object : FragmentManager.FragmentLifecycleCallbacks() {
-            override fun onFragmentViewCreated(fm: FragmentManager, f: Fragment, v: View, savedInstanceState: Bundle?) {
+            override fun onFragmentViewCreated(fm: FragmentManager, f: Fragment, v: View, savedState: Bundle?) {
                 if (f is IToolBarSupportFragment) {
                     setSupportActionBar(f.toolbar)
                 }
@@ -136,10 +139,12 @@ class LinkHandlerActivity : BaseActivity(), SystemWindowsInsetsCallback, IContro
                 supportRequestWindowFeature(Window.FEATURE_NO_TITLE)
                 supportRequestWindowFeature(WindowCompat.FEATURE_ACTION_MODE_OVERLAY)
             }
+            ViewCompat.setOnApplyWindowInsetsListener(window.findViewById(android.R.id.content), this)
             contentFragmentId = android.R.id.content
         } else {
             setContentView(R.layout.activity_link_handler)
-            toolbar?.let { toolbar ->
+            val toolbar = this.toolbar
+            if (toolbar != null) {
                 if (supportActionBar != null) {
                     toolbar.visibility = View.GONE
                     windowOverlay?.visibility = View.GONE
@@ -153,6 +158,7 @@ class LinkHandlerActivity : BaseActivity(), SystemWindowsInsetsCallback, IContro
                 val f = currentVisibleFragment as? IFloatingActionButtonFragment
                 f?.onActionClick("link_handler")
             }
+            contentView.applyWindowInsetsListener = this
             contentFragmentId = R.id.contentFragment
         }
 
@@ -163,8 +169,10 @@ class LinkHandlerActivity : BaseActivity(), SystemWindowsInsetsCallback, IContro
             ft.commit()
         }
         setTitle(linkId, uri)
-        finishOnly = uri.getQueryParameter(QUERY_PARAM_FINISH_ONLY)?.toBoolean() ?: false
+        finishOnly = uri.getQueryParameter(QUERY_PARAM_FINISH_ONLY)?.toBoolean() == true
 
+        supportActionBar?.setBackgroundDrawable(ActionBarColorDrawable.create(overrideTheme.colorToolbar,
+                true))
         if (fragment is IToolBarSupportFragment) {
             ThemeUtils.setCompatContentViewOverlay(window, EmptyDrawable())
         }
@@ -205,12 +213,17 @@ class LinkHandlerActivity : BaseActivity(), SystemWindowsInsetsCallback, IContro
         return false
     }
 
-    override fun onFitSystemWindows(insets: Rect) {
-        super.onFitSystemWindows(insets)
+    override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
+        val result = super.onApplyWindowInsets(v, insets)
         val fragment = currentVisibleFragment
         if (fragment is IBaseFragment<*>) {
-            fragment.requestFitSystemWindows()
+            fragment.requestApplyInsets()
         }
+        if (fragment is IToolBarSupportFragment) {
+            return result
+        }
+        contentView?.statusBarHeight = insets.systemWindowInsetTop - controlBarHeight
+        return result.consumeSystemWindowInsets()
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -330,11 +343,13 @@ class LinkHandlerActivity : BaseActivity(), SystemWindowsInsetsCallback, IContro
         get() {
             val fragment = currentVisibleFragment
             val actionBar = supportActionBar
+            var height = 0
             if (fragment is IToolBarSupportFragment) {
-                return fragment.controlBarHeight
+                fragment.controlBarHeight
             } else if (actionBar != null) {
-                return actionBar.height
+                height = actionBar.height
             }
+            if (height != 0) return height
             if (actionBarHeight != 0) return actionBarHeight
             actionBarHeight = ThemeUtils.getActionBarHeight(this)
             return actionBarHeight
@@ -518,7 +533,7 @@ class LinkHandlerActivity : BaseActivity(), SystemWindowsInsetsCallback, IContro
     }
 
     private fun updateActionsButton() {
-        val fab = window.findViewById(R.id.actionsButton) as? FloatingActionButton ?: return
+        val fab = window.findViewById<FloatingActionButton>(R.id.actionsButton) ?: return
         val fragment = currentVisibleFragment as? IFloatingActionButtonFragment
         val info = fragment?.getActionInfo("link_handler") ?: run {
             fab.visibility = View.GONE
@@ -601,8 +616,6 @@ class LinkHandlerActivity : BaseActivity(), SystemWindowsInsetsCallback, IContro
                 if (paramUserKey != null) {
                     userHost = paramUserKey.host
                 }
-
-                args.putString(EXTRA_REFERRAL, intent.getStringExtra(EXTRA_REFERRAL))
             }
             LINK_ID_USER_LIST_MEMBERSHIPS -> {
                 fragment = UserListMembershipsFragment()
@@ -905,8 +918,8 @@ class LinkHandlerActivity : BaseActivity(), SystemWindowsInsetsCallback, IContro
     }
 
     interface HideUiOnScroll
-    
-    private fun Uri.getUserKeyQueryParameter() : UserKey? {
+
+    private fun Uri.getUserKeyQueryParameter(): UserKey? {
         val value = getQueryParameter(QUERY_PARAM_USER_KEY) ?: getQueryParameter(QUERY_PARAM_USER_ID)
         return value?.let(UserKey::valueOf)
     }

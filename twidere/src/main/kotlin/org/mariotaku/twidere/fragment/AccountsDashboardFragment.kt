@@ -25,6 +25,7 @@ import android.animation.Animator
 import android.animation.Animator.AnimatorListener
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -50,7 +51,6 @@ import android.view.*
 import android.view.View.OnClickListener
 import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
-import com.bumptech.glide.Glide
 import kotlinx.android.synthetic.main.header_drawer_account_selector.view.*
 import org.mariotaku.chameleon.Chameleon
 import org.mariotaku.kpreferences.get
@@ -68,7 +68,6 @@ import org.mariotaku.twidere.adapter.RecyclerPagerAdapter
 import org.mariotaku.twidere.annotation.AccountType
 import org.mariotaku.twidere.annotation.CustomTabType
 import org.mariotaku.twidere.annotation.ProfileImageSize
-import org.mariotaku.twidere.annotation.Referral
 import org.mariotaku.twidere.constant.KeyboardShortcutConstants.*
 import org.mariotaku.twidere.constant.extraFeaturesNoticeVersionKey
 import org.mariotaku.twidere.constant.iWantMyStarsBackKey
@@ -77,6 +76,7 @@ import org.mariotaku.twidere.constant.profileImageStyleKey
 import org.mariotaku.twidere.extension.loadProfileBanner
 import org.mariotaku.twidere.extension.loadProfileImage
 import org.mariotaku.twidere.extension.model.setActivated
+import org.mariotaku.twidere.extension.queryCount
 import org.mariotaku.twidere.fragment.AccountsDashboardFragment.AccountsInfo
 import org.mariotaku.twidere.graphic.BadgeDrawable
 import org.mariotaku.twidere.menu.AccountToggleProvider
@@ -95,7 +95,6 @@ class AccountsDashboardFragment : BaseFragment(), LoaderCallbacks<AccountsInfo>,
         OnSharedPreferenceChangeListener, OnClickListener, KeyboardShortcutCallback,
         NavigationView.OnNavigationItemSelectedListener, AccountSelectorAdapter.Listener {
 
-    private val EXTRA_SYNC_LOAD = "sync_load"
     private val systemWindowsInsets = Rect()
 
     private lateinit var accountsAdapter: AccountSelectorAdapter
@@ -120,10 +119,10 @@ class AccountsDashboardFragment : BaseFragment(), LoaderCallbacks<AccountsInfo>,
     private var useStarsForLikes: Boolean = false
     private var loaderInitialized: Boolean = false
 
+    @SuppressLint("RestrictedApi")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
-        val inflater = getLayoutInflater(savedInstanceState)
-        accountsAdapter = AccountSelectorAdapter(inflater, preferences, Glide.with(this)).also {
+        accountsAdapter = AccountSelectorAdapter(layoutInflater, preferences, requestManager).also {
             it.listener = this
         }
         accountsSelector.adapter = accountsAdapter
@@ -183,7 +182,7 @@ class AccountsDashboardFragment : BaseFragment(), LoaderCallbacks<AccountsInfo>,
         accountProfileBanner.setInAnimation(context, android.R.anim.fade_in)
         accountProfileBanner.setOutAnimation(context, android.R.anim.fade_out)
         accountProfileBanner.setFactory {
-            inflater.inflate(R.layout.layout_account_dashboard_profile_banner,
+            layoutInflater.inflate(R.layout.layout_account_dashboard_profile_banner,
                     accountProfileBanner, false)
         }
 
@@ -248,11 +247,11 @@ class AccountsDashboardFragment : BaseFragment(), LoaderCallbacks<AccountsInfo>,
                 val activity = activity
                 if (account.user != null) {
                     IntentUtils.openUserProfile(activity, account.user!!,
-                            preferences[newDocumentApiKey], Referral.SELF_PROFILE, null)
+                            preferences[newDocumentApiKey], null)
                 } else {
                     IntentUtils.openUserProfile(activity, account.key, account.key,
                             account.user.screen_name, null, preferences[newDocumentApiKey],
-                            Referral.SELF_PROFILE, null)
+                            null)
                 }
             }
         }
@@ -277,7 +276,7 @@ class AccountsDashboardFragment : BaseFragment(), LoaderCallbacks<AccountsInfo>,
         }
     }
 
-    override fun fitSystemWindows(insets: Rect) {
+    override fun onApplySystemWindowInsets(insets: Rect) {
         systemWindowsInsets.set(insets)
         updateSystemWindowsInsets()
     }
@@ -325,6 +324,7 @@ class AccountsDashboardFragment : BaseFragment(), LoaderCallbacks<AccountsInfo>,
     }
 
     private fun updateSystemWindowsInsets() {
+        profileContainer?.setPadding(0, systemWindowsInsets.top, 0, 0)
     }
 
     internal fun updateAccountActions() {
@@ -368,9 +368,9 @@ class AccountsDashboardFragment : BaseFragment(), LoaderCallbacks<AccountsInfo>,
             val icon = ContextCompat.getDrawable(context, R.drawable.ic_action_infinity)
             val color = ContextCompat.getColor(context, R.color.material_red)
             val size = resources.getDimensionPixelSize(R.dimen.element_spacing_msmall)
-            menu.setMenuItemIcon(R.id.premium_features, BadgeDrawable(icon, color, size))
+            menu.setItemIcon(R.id.premium_features, BadgeDrawable(icon, color, size))
         } else {
-            menu.setMenuItemIcon(R.id.premium_features, R.drawable.ic_action_infinity)
+            menu.setItemIcon(R.id.premium_features, R.drawable.ic_action_infinity)
         }
         var hasLists = false
         var hasGroups = false
@@ -474,7 +474,7 @@ class AccountsDashboardFragment : BaseFragment(), LoaderCallbacks<AccountsInfo>,
                 clickedColors = clickedImageView.borderColors
                 val oldSelectedAccount = accountsAdapter.selectedAccount ?: return
                 val profileImageStyle = preferences[profileImageStyleKey]
-                Glide.with(this@AccountsDashboardFragment).loadProfileImage(context, oldSelectedAccount,
+                requestManager.loadProfileImage(context, oldSelectedAccount,
                         profileImageStyle, clickedImageView.cornerRadius, clickedImageView.cornerRadiusRatio)
                         .into(clickedImageView).onLoadStarted(profileDrawable)
                 //TODO complete border color
@@ -536,7 +536,7 @@ class AccountsDashboardFragment : BaseFragment(), LoaderCallbacks<AccountsInfo>,
             ColorDrawable(Chameleon.getOverrideTheme(activity, activity).colorPrimary)
         }
 
-        Glide.with(this).loadProfileBanner(context, account.user, width).fallback(fallbackBanner)
+        requestManager.loadProfileBanner(context, account.user, width).fallback(fallbackBanner)
                 .into(bannerView)
     }
 
@@ -545,7 +545,7 @@ class AccountsDashboardFragment : BaseFragment(), LoaderCallbacks<AccountsInfo>,
         val account = accountsAdapter.selectedAccount ?: return
         accountProfileNameView.spannable = account.user.name
         accountProfileScreenNameView.spannable = "@${account.user.screen_name}"
-        Glide.with(this).loadProfileImage(context, account, preferences[profileImageStyleKey],
+        requestManager.loadProfileImage(context, account, preferences[profileImageStyleKey],
                 accountProfileImageView.cornerRadius, accountProfileImageView.cornerRadiusRatio,
                 ProfileImageSize.REASONABLY_SMALL).placeholder(profileImageSnapshot).into(accountProfileImageView)
         //TODO complete border color
@@ -742,7 +742,7 @@ class AccountsDashboardFragment : BaseFragment(), LoaderCallbacks<AccountsInfo>,
         private fun loadAccountsInfo(loadFromDb: Boolean): AccountsInfo {
             val accounts = AccountUtils.getAllAccountDetails(AccountManager.get(context), true)
             val draftsCount = if (loadFromDb) {
-                DataStoreUtils.queryCount(context.contentResolver, Drafts.CONTENT_URI_UNSENT, null,
+                context.contentResolver.queryCount(Drafts.CONTENT_URI_UNSENT, null,
                         null)
             } else {
                 -1

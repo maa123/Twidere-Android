@@ -25,18 +25,19 @@ import android.content.DialogInterface.OnClickListener
 import android.os.Bundle
 import android.support.v4.app.FragmentManager
 import android.support.v7.app.AlertDialog
-import android.widget.EditText
+import kotlinx.android.synthetic.main.dialog_edit_user_nickname.*
 import org.mariotaku.ktextension.empty
 import org.mariotaku.twidere.R
 import org.mariotaku.twidere.constant.IntentConstants.EXTRA_NAME
 import org.mariotaku.twidere.constant.IntentConstants.EXTRA_USER_KEY
 import org.mariotaku.twidere.extension.applyTheme
+import org.mariotaku.twidere.extension.onShow
 import org.mariotaku.twidere.model.UserKey
 
 class SetUserNicknameDialogFragment : BaseDialogFragment(), OnClickListener {
 
     override fun onClick(dialog: DialogInterface, which: Int) {
-        val editName = (dialog as AlertDialog).findViewById(R.id.editName) as EditText
+        val editName = (dialog as AlertDialog).editName
         val userKey = arguments.getParcelable<UserKey>(EXTRA_USER_KEY)
         when (which) {
             DialogInterface.BUTTON_POSITIVE -> {
@@ -65,24 +66,26 @@ class SetUserNicknameDialogFragment : BaseDialogFragment(), OnClickListener {
         builder.setNegativeButton(android.R.string.cancel, null)
         builder.setView(R.layout.dialog_edit_user_nickname)
         val dialog = builder.create()
-        dialog.setOnShowListener {
-            it as AlertDialog
-            it.applyTheme()
-        }
+        dialog.onShow { it.applyTheme() }
         return dialog
     }
 
     companion object {
 
-        private val FRAGMENT_TAG_SET_USER_NICKNAME = "set_user_nickname"
+        const val FRAGMENT_TAG = "set_user_nickname"
 
-        fun show(fm: FragmentManager, userKey: UserKey, nickname: String?): SetUserNicknameDialogFragment {
+        fun create(userKey: UserKey, nickname: String?): SetUserNicknameDialogFragment {
             val f = SetUserNicknameDialogFragment()
             val args = Bundle()
             args.putParcelable(EXTRA_USER_KEY, userKey)
             args.putString(EXTRA_NAME, nickname)
             f.arguments = args
-            f.show(fm, FRAGMENT_TAG_SET_USER_NICKNAME)
+            return f
+        }
+
+        fun show(fm: FragmentManager, userKey: UserKey, nickname: String?): SetUserNicknameDialogFragment {
+            val f = create(userKey, nickname)
+            f.show(fm, FRAGMENT_TAG)
             return f
         }
     }

@@ -23,7 +23,6 @@ import android.app.Activity
 import android.app.Dialog
 import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
 import android.nfc.NdefMessage
 import android.nfc.NdefRecord
@@ -32,6 +31,7 @@ import android.os.Bundle
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import android.support.v4.content.FixedAsyncTaskLoader
 import android.support.v4.content.Loader
+import android.support.v4.content.pm.ShortcutManagerCompat
 import android.support.v7.app.AlertDialog
 import android.text.TextUtils
 import android.util.Log
@@ -40,14 +40,11 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.View.OnClickListener
-import android.widget.CheckBox
-import com.rengwuxian.materialedittext.MaterialEditText
 import com.squareup.otto.Subscribe
 import org.mariotaku.kpreferences.get
 import org.mariotaku.ktextension.setItemAvailability
 import org.mariotaku.microblog.library.MicroBlogException
 import org.mariotaku.microblog.library.twitter.model.UserList
-import org.mariotaku.microblog.library.twitter.model.UserListUpdate
 import org.mariotaku.twidere.Constants.*
 import org.mariotaku.twidere.R
 import org.mariotaku.twidere.activity.AccountSelectorActivity
@@ -57,7 +54,8 @@ import org.mariotaku.twidere.app.TwidereApplication
 import org.mariotaku.twidere.constant.newDocumentApiKey
 import org.mariotaku.twidere.extension.applyTheme
 import org.mariotaku.twidere.extension.model.api.microblog.toParcelable
-import org.mariotaku.twidere.fragment.iface.IBaseFragment.SystemWindowsInsetsCallback
+import org.mariotaku.twidere.extension.onShow
+import org.mariotaku.twidere.fragment.iface.IBaseFragment.SystemWindowInsetsCallback
 import org.mariotaku.twidere.fragment.iface.SupportFragmentCallback
 import org.mariotaku.twidere.fragment.statuses.UserListTimelineFragment
 import org.mariotaku.twidere.fragment.users.UserListMembersFragment
@@ -68,11 +66,11 @@ import org.mariotaku.twidere.model.SingleResponse
 import org.mariotaku.twidere.model.UserKey
 import org.mariotaku.twidere.model.event.UserListSubscriptionEvent
 import org.mariotaku.twidere.model.event.UserListUpdatedEvent
-import org.mariotaku.twidere.text.validator.UserListNameValidator
 import org.mariotaku.twidere.util.*
+import org.mariotaku.twidere.util.shortcut.ShortcutCreator
 
 class UserListFragment : AbsToolbarTabPagesFragment(), OnClickListener,
-        LoaderCallbacks<SingleResponse<ParcelableUserList>>, SystemWindowsInsetsCallback,
+        LoaderCallbacks<SingleResponse<ParcelableUserList>>, SystemWindowInsetsCallback,
         SupportFragmentCallback {
 
     private var userListLoaderInitialized: Boolean = false
@@ -208,11 +206,13 @@ class UserListFragment : AbsToolbarTabPagesFragment(), OnClickListener,
             extensionsIntent.setExtrasClassLoader(TwidereApplication::class.java.classLoader)
             extensionsIntent.putExtra(EXTRA_USER_LIST, userList)
             MenuUtils.addIntentToMenu(activity, menu, extensionsIntent, MENU_GROUP_USER_LIST_EXTENSION)
+            menu.setItemAvailability(R.id.add_to_home_screen_submenu, ShortcutManagerCompat.isRequestPinShortcutSupported(context))
         } else {
             menu.setItemAvailability(R.id.edit, false)
             menu.setItemAvailability(R.id.follow, false)
             menu.setItemAvailability(R.id.add, false)
             menu.setItemAvailability(R.id.delete, false)
+            menu.setItemAvailability(R.id.add_to_home_screen_submenu, false)
         }
     }
 
@@ -263,6 +263,11 @@ class UserListFragment : AbsToolbarTabPagesFragment(), OnClickListener,
                 df.arguments.putParcelable(EXTRA_USER_LIST, userList)
                 df.show(childFragmentManager, "user_list_details")
             }
+            R.id.add_statuses_to_home_screen -> {
+                ShortcutCreator.performCreation(this) {
+                    ShortcutCreator.userListTimeline(context, userList.account_key, userList)
+                }
+            }
             else -> {
                 if (item.intent != null) {
                     try {
@@ -286,7 +291,7 @@ class UserListFragment : AbsToolbarTabPagesFragment(), OnClickListener,
             R.id.profileImage -> {
                 val userList = this.userList ?: return
                 IntentUtils.openUserProfile(activity, userList.account_key, userList.user_key,
-                        userList.user_screen_name, null, preferences[newDocumentApiKey], null, null)
+                        userList.user_screen_name, null, preferences[newDocumentApiKey], null)
             }
         }
 
@@ -332,57 +337,6 @@ class UserListFragment : AbsToolbarTabPagesFragment(), OnClickListener,
         if (TextUtils.equals(event.userList.id, userList!!.id)) {
             getUserListInfo(true)
         }
-    }
-
-    class EditUserListDialogFragment : BaseDialogFragment(), DialogInterface.OnClickListener {
-
-        private val accountKey by lazy { arguments.getParcelable<UserKey>(EXTRA_ACCOUNT_KEY) }
-        private val listId: String by lazy { arguments.getString(EXTRA_LIST_ID) }
-
-        override fun onClick(dialog: DialogInterface, which: Int) {
-            when (which) {
-                DialogInterface.BUTTON_POSITIVE -> {
-                    val alertDialog = dialog as AlertDialog
-                    val editName = alertDialog.findViewById(R.id.name) as MaterialEditText
-                    val editDescription = alertDialog.findViewById(R.id.description) as MaterialEditText
-                    val editIsPublic = alertDialog.findViewById(R.id.is_public) as CheckBox
-                    val name = ParseUtils.parseString(editName.text)
-                    val description = ParseUtils.parseString(editDescription.text)
-                    val isPublic = editIsPublic.isChecked
-                    if (TextUtils.isEmpty(name)) return
-                    val update = UserListUpdate()
-                    update.setMode(if (isPublic) UserList.Mode.PUBLIC else UserList.Mode.PRIVATE)
-                    update.setName(name)
-                    update.setDescription(description)
-                    twitterWrapper.updateUserListDetails(accountKey, listId, update)
-                }
-            }
-
-        }
-
-        override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-            val builder = AlertDialog.Builder(context)
-            builder.setView(R.layout.dialog_user_list_detail_editor)
-            builder.setTitle(R.string.title_user_list)
-            builder.setPositiveButton(android.R.string.ok, this)
-            builder.setNegativeButton(android.R.string.cancel, this)
-            val dialog = builder.create()
-            dialog.setOnShowListener { dialog ->
-                dialog as AlertDialog
-                dialog.applyTheme()
-                val editName = dialog.findViewById(R.id.name) as MaterialEditText
-                val editDescription = dialog.findViewById(R.id.description) as MaterialEditText
-                val editPublic = dialog.findViewById(R.id.is_public) as CheckBox
-                editName.addValidator(UserListNameValidator(getString(R.string.invalid_list_name)))
-                if (savedInstanceState == null) {
-                    editName.setText(arguments.getString(EXTRA_LIST_NAME))
-                    editDescription.setText(arguments.getString(EXTRA_DESCRIPTION))
-                    editPublic.isChecked = arguments.getBoolean(EXTRA_IS_PUBLIC, true)
-                }
-            }
-            return dialog
-        }
-
     }
 
     internal class ParcelableUserListLoader(
@@ -441,10 +395,7 @@ class UserListFragment : AbsToolbarTabPagesFragment(), OnClickListener,
             builder.setMessage(userList.description)
             builder.setPositiveButton(android.R.string.ok, null)
             val dialog = builder.create()
-            dialog.setOnShowListener {
-                it as AlertDialog
-                it.applyTheme()
-            }
+            dialog.onShow { it.applyTheme() }
             return dialog
         }
     }

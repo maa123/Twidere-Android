@@ -40,9 +40,13 @@ import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextUtils
 import android.view.*
-import android.widget.*
+import android.widget.AbsListView
 import android.widget.AbsListView.MultiChoiceModeListener
+import android.widget.ListView
+import android.widget.TextView
+import android.widget.Toast
 import com.bumptech.glide.Glide
+import kotlinx.android.synthetic.main.dialog_auto_complete_textview.*
 import kotlinx.android.synthetic.main.fragment_content_listview.*
 import org.mariotaku.ktextension.setGroupAvailability
 import org.mariotaku.library.objectcursor.ObjectCursor
@@ -61,7 +65,6 @@ import org.mariotaku.twidere.model.FiltersData
 import org.mariotaku.twidere.model.util.AccountUtils
 import org.mariotaku.twidere.provider.TwidereDataStore.Filters
 import org.mariotaku.twidere.text.style.EmojiSpan
-import org.mariotaku.twidere.util.DataStoreUtils
 import org.mariotaku.twidere.util.ParseUtils
 import org.mariotaku.twidere.util.ThemeUtils
 
@@ -259,7 +262,7 @@ abstract class BaseFiltersFragment : AbsContentListViewFragment<SimpleCursorAdap
                     if (id >= 0) {
                         val valueWhere = Expression.equalsArgs(Filters.VALUE).sql
                         val valueWhereArgs = arrayOf(text)
-                        if (DataStoreUtils.queryCount(resolver, uri, valueWhere, valueWhereArgs) == 0) {
+                        if (resolver.queryCount(uri, valueWhere, valueWhereArgs) == 0) {
                             val idWhere = Expression.equals(Filters._ID, id).sql
                             resolver.update(uri, values, idWhere, null)
                         } else {
@@ -275,8 +278,6 @@ abstract class BaseFiltersFragment : AbsContentListViewFragment<SimpleCursorAdap
         }
 
         override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-            val activity = activity
-            val context = activity
             val builder = AlertDialog.Builder(context)
             builder.setView(R.layout.dialog_auto_complete_textview)
 
@@ -288,10 +289,9 @@ abstract class BaseFiltersFragment : AbsContentListViewFragment<SimpleCursorAdap
             builder.setPositiveButton(android.R.string.ok, this)
             builder.setNegativeButton(android.R.string.cancel, this)
             val dialog = builder.create()
-            dialog.setOnShowListener {
-                val alertDialog = it as AlertDialog
+            dialog.onShow {
                 it.applyTheme()
-                val editText = (alertDialog.findViewById(R.id.edit_text) as AutoCompleteTextView?)!!
+                val editText = it.editText
                 if (savedInstanceState == null) {
                     editText.setText(arguments.getString(EXTRA_VALUE))
                 }
@@ -301,7 +301,7 @@ abstract class BaseFiltersFragment : AbsContentListViewFragment<SimpleCursorAdap
                     if (autoCompleteType == AUTO_COMPLETE_TYPE_SOURCES) {
                         userAutoCompleteAdapter = SourceAutoCompleteAdapter(activity)
                     } else {
-                        val adapter = ComposeAutoCompleteAdapter(activity, Glide.with(this))
+                        val adapter = ComposeAutoCompleteAdapter(activity, requestManager)
                         val am = AccountManager.get(activity)
                         adapter.account = AccountUtils.getDefaultAccountDetails(activity, am, false)
                         userAutoCompleteAdapter = adapter
@@ -316,8 +316,7 @@ abstract class BaseFiltersFragment : AbsContentListViewFragment<SimpleCursorAdap
         private val text: String
             get() {
                 val alertDialog = dialog as AlertDialog
-                val editText = (alertDialog.findViewById(R.id.edit_text) as AutoCompleteTextView?)!!
-                return ParseUtils.parseString(editText.text)
+                return ParseUtils.parseString(alertDialog.editText.text)
             }
 
     }
@@ -343,7 +342,7 @@ abstract class BaseFiltersFragment : AbsContentListViewFragment<SimpleCursorAdap
         override fun bindView(view: View, context: Context, cursor: Cursor) {
             super.bindView(view, context, cursor)
             val indices = this.indices!!
-            val text1 = view.findViewById(android.R.id.text1) as TextView
+            val text1 = view.findViewById<TextView>(android.R.id.text1)
 
             val ssb = SpannableStringBuilder(cursor.getString(indices[Filters.VALUE]))
             if (cursor.getLong(indices[Filters.SOURCE]) >= 0) {

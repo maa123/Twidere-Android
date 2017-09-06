@@ -56,6 +56,7 @@ import org.mariotaku.twidere.activity.MediaViewerActivity
 import org.mariotaku.twidere.annotation.CacheFileType
 import org.mariotaku.twidere.constant.IntentConstants.EXTRA_POSITION
 import org.mariotaku.twidere.extension.model.authorizationHeader
+import org.mariotaku.twidere.extension.model.getBestVideoUrlAndType
 import org.mariotaku.twidere.fragment.iface.IBaseFragment
 import org.mariotaku.twidere.fragment.media.VideoPageFragment.Companion.EXTRA_PAUSED_BY_USER
 import org.mariotaku.twidere.fragment.media.VideoPageFragment.Companion.EXTRA_PLAY_AUDIO
@@ -180,7 +181,7 @@ class ExoPlayerPageFragment : MediaViewerFragment(), IBaseFragment<ExoPlayerPage
         }
         playerView.useController = !isControlDisabled
         playerView.controllerShowTimeoutMs = 0
-        playerView.setOnSystemUiVisibilityChangeListener { visibility ->
+        playerView.setOnSystemUiVisibilityChangeListener {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN) return@setOnSystemUiVisibilityChangeListener
             val visible = MediaViewerActivity.FLAG_SYSTEM_UI_HIDE_BARS !in
                     activity.window.decorView.systemUiVisibility
@@ -253,7 +254,7 @@ class ExoPlayerPageFragment : MediaViewerFragment(), IBaseFragment<ExoPlayerPage
         return inflater.inflate(R.layout.layout_media_viewer_exo_player_view, parent, false)
     }
 
-    override fun fitSystemWindows(insets: Rect) {
+    override fun onApplySystemWindowInsets(insets: Rect) {
         val lp = videoControl.layoutParams
         if (lp is ViewGroup.MarginLayoutParams) {
             lp.bottomMargin = insets.bottom
@@ -271,7 +272,7 @@ class ExoPlayerPageFragment : MediaViewerFragment(), IBaseFragment<ExoPlayerPage
 
     override fun onViewStateRestored(savedInstanceState: Bundle?) {
         super.onViewStateRestored(savedInstanceState)
-        requestFitSystemWindows()
+        requestApplyInsets()
     }
 
     override fun executeAfterFragmentResumed(useHandler: Boolean, action: (ExoPlayerPageFragment) -> Unit) = TODO()
@@ -331,8 +332,8 @@ class ExoPlayerPageFragment : MediaViewerFragment(), IBaseFragment<ExoPlayerPage
     }
 
     private fun ParcelableMedia.getDownloadUri(): Uri? {
-        val bestVideoUrlAndType = VideoPageFragment.getBestVideoUrlAndType(this, SUPPORTED_VIDEO_TYPES)
-        if (bestVideoUrlAndType != null && bestVideoUrlAndType.first != null) {
+        val bestVideoUrlAndType = this.getBestVideoUrlAndType(SUPPORTED_VIDEO_TYPES)
+        if (bestVideoUrlAndType != null) {
             return Uri.parse(bestVideoUrlAndType.first)
         }
         return arguments.getParcelable<Uri>(SubsampleImageViewerFragment.EXTRA_MEDIA_URI)
@@ -384,7 +385,7 @@ class ExoPlayerPageFragment : MediaViewerFragment(), IBaseFragment<ExoPlayerPage
         override val specialCharacter: Char = '_'
 
         override fun inputStream(): InputStream {
-            return request().body().byteStream()
+            return request().body()!!.byteStream()
         }
 
         override fun close() {

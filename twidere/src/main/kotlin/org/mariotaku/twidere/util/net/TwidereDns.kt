@@ -36,7 +36,7 @@ import java.util.*
 import javax.inject.Singleton
 
 @Singleton
-class TwidereDns(context: Context, private val preferences: SharedPreferences) : Dns {
+class TwidereDns(val context: Context, private val preferences: SharedPreferences) : Dns {
 
     private val hostMapping = context.getSharedPreferences(HOST_MAPPING_PREFERENCES_NAME,
             Context.MODE_PRIVATE)
@@ -78,6 +78,16 @@ class TwidereDns(context: Context, private val preferences: SharedPreferences) :
     fun reloadDnsSettings() {
         this.resolver = null
         useResolver = preferences.getBoolean(KEY_BUILTIN_DNS_RESOLVER, false)
+    }
+
+    fun putMapping(host: String, address: String) {
+        beginMappingTransaction {
+            this[host] = address
+        }
+    }
+
+    fun beginMappingTransaction(action: MappingTransaction.() -> Unit) {
+        hostMapping.edit().apply { action(MappingTransaction(this)) }.apply()
     }
 
     @Throws(IOException::class, SecurityException::class)
@@ -131,11 +141,10 @@ class TwidereDns(context: Context, private val preferences: SharedPreferences) :
         logger.dumpToLog()
     }
 
-
     private fun addLogSplit(logger: TimingLogger, host: String, message: String, depth: Int) {
         if (BuildConfig.DEBUG) return
         val sb = StringBuilder()
-        for (i in 0..depth - 1) {
+        for (i in 0 until depth) {
             sb.append(">")
         }
         sb.append(" ")
@@ -191,7 +200,9 @@ class TwidereDns(context: Context, private val preferences: SharedPreferences) :
     private fun getResolver(): Resolver {
         return this.resolver ?: run {
             val tcp = preferences.getBoolean(KEY_TCP_DNS_QUERY, false)
-            val resolvers = preferences.getString(KEY_DNS_SERVER, null)?.split(';', ',', ' ')?.mapNotNull {
+            val servers = preferences.getString(KEY_DNS_SERVER, null)?.split(';', ',', ' ') ?:
+                    SystemDnsFetcher.get(context)
+            val resolvers = servers?.mapNotNull {
                 val segs = it.split("#", limit = 2)
                 if (segs.isEmpty()) return@mapNotNull null
                 if (!isValidIpAddress(segs[0])) return@mapNotNull null
@@ -205,10 +216,10 @@ class TwidereDns(context: Context, private val preferences: SharedPreferences) :
                 }
             }
             val resolver: Resolver
-            if (resolvers != null && resolvers.isNotEmpty()) {
-                resolver = ExtendedResolver(resolvers.toTypedArray())
+            resolver = if (resolvers != null && resolvers.isNotEmpty()) {
+                ExtendedResolver(resolvers.toTypedArray())
             } else {
-                resolver = SimpleResolver()
+                SimpleResolver()
             }
             resolver.setTCP(tcp)
             this.resolver = resolver
@@ -267,16 +278,16 @@ class TwidereDns(context: Context, private val preferences: SharedPreferences) :
                 val a = lookup.run()
                 if (a == null) {
                     if (lookup.result == Lookup.TYPE_NOT_FOUND) {
-                        val aaaa = newLookup(resolver, name, Type.AAAA).run()
-                        if (aaaa != null)
-                            return aaaa
+//                        val aaaa = newLookup(resolver, name, Type.AAAA).run()
+//                        if (aaaa != null) return aaaa
                     }
                     throw UnknownHostException("unknown host")
                 }
                 if (!all)
                     return a
-                val aaaa = newLookup(resolver, name, Type.AAAA).run() ?: return a
-                return a + aaaa
+//                val aaaa = newLookup(resolver, name, Type.AAAA).run() ?: return a
+//                return a + aaaa
+                return a
             } catch (e: TextParseException) {
                 throw UnknownHostException("invalid name")
             }
@@ -299,6 +310,16 @@ class TwidereDns(context: Context, private val preferences: SharedPreferences) :
                 addr = (r as AAAARecord).address
             }
             return InetAddress.getByAddress(name, addr.address)
+        }
+    }
+
+    class MappingTransaction(private val editor: SharedPreferences.Editor) {
+        operator fun set(host: String, address: String) {
+            editor.putString(host, address)
+        }
+
+        fun remove(host: String) {
+            editor.remove(host)
         }
     }
 

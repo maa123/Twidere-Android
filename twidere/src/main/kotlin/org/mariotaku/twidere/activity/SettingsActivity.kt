@@ -28,6 +28,7 @@ import android.os.Bundle
 import android.support.annotation.DrawableRes
 import android.support.annotation.XmlRes
 import android.support.v4.app.Fragment
+import android.support.v4.view.ViewCompat
 import android.support.v7.app.AlertDialog
 import android.support.v7.preference.Preference
 import android.support.v7.preference.PreferenceFragmentCompat
@@ -47,6 +48,7 @@ import org.mariotaku.twidere.constant.IntentConstants.*
 import org.mariotaku.twidere.constant.KeyboardShortcutConstants.ACTION_NAVIGATION_BACK
 import org.mariotaku.twidere.constant.KeyboardShortcutConstants.CONTEXT_TAG_NAVIGATION
 import org.mariotaku.twidere.extension.applyTheme
+import org.mariotaku.twidere.extension.onShow
 import org.mariotaku.twidere.fragment.*
 import org.mariotaku.twidere.util.DeviceUtils
 import org.mariotaku.twidere.util.KeyboardShortcutsHandler
@@ -85,6 +87,12 @@ class SettingsActivity : BaseActivity(), OnItemClickListener, OnPreferenceStartF
         slidingPane.setShadowResourceLeft(R.drawable.sliding_pane_shadow_left)
         slidingPane.setShadowResourceRight(R.drawable.sliding_pane_shadow_right)
         slidingPane.sliderFadeColor = 0
+
+        ViewCompat.setOnApplyWindowInsetsListener(slidingPane) listener@ { view, insets ->
+            onApplyWindowInsets(view, insets)
+            entriesList.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
+            return@listener insets
+        }
 
         initEntries()
         entriesList.adapter = entriesAdapter
@@ -367,8 +375,8 @@ class SettingsActivity : BaseActivity(), OnItemClickListener, OnPreferenceStartF
     ) : Entry() {
 
         override fun bind(view: View) {
-            (view.findViewById(android.R.id.icon) as ImageView).setImageResource(icon)
-            (view.findViewById(android.R.id.title) as TextView).text = title
+            view.findViewById<ImageView>(android.R.id.icon).setImageResource(icon)
+            view.findViewById<TextView>(android.R.id.title).text = title
         }
 
     }
@@ -377,7 +385,7 @@ class SettingsActivity : BaseActivity(), OnItemClickListener, OnPreferenceStartF
 
         override fun bind(view: View) {
             val theme = Chameleon.getOverrideTheme(view.context, view.context)
-            val textView = view.findViewById(android.R.id.title) as TextView
+            val textView: TextView = view.findViewById(android.R.id.title)
             textView.setTextColor(ThemeUtils.getOptimalAccentColor(theme.colorAccent,
                     theme.colorForeground))
             textView.text = title
@@ -396,10 +404,7 @@ class SettingsActivity : BaseActivity(), OnItemClickListener, OnPreferenceStartF
             }
             builder.setPositiveButton(android.R.string.ok, this)
             val dialog = builder.create()
-            dialog.setOnShowListener {
-                it as AlertDialog
-                it.applyTheme()
-            }
+            dialog.onShow { it.applyTheme() }
             return dialog
         }
 

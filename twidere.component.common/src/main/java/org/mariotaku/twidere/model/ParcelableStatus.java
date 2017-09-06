@@ -280,26 +280,28 @@ public class ParcelableStatus implements Parcelable, Comparable<ParcelableStatus
     public ParcelableLocation location;
 
     @JsonField(name = "place_full_name")
-    @CursorField(value = Statuses.PLACE_FULL_NAME, converter = LoganSquareCursorFieldConverter.class)
+    @CursorField(value = Statuses.PLACE_FULL_NAME)
     public String place_full_name;
 
     @JsonField(name = "mentions")
     @CursorField(value = Statuses.MENTIONS_JSON, converter = LoganSquareCursorFieldConverter.class)
     public ParcelableUserMention[] mentions;
 
+    // TODO: Simplify for list loader
     @JsonField(name = "media")
     @CursorField(value = Statuses.MEDIA_JSON, converter = LoganSquareCursorFieldConverter.class)
     @Nullable
     public ParcelableMedia[] media;
 
+    // TODO: Simplify for list loader
     @JsonField(name = "quoted_media")
     @CursorField(value = Statuses.QUOTED_MEDIA_JSON, converter = LoganSquareCursorFieldConverter.class)
     @Nullable
     public ParcelableMedia[] quoted_media;
-    @Nullable
 
     @JsonField(name = "card")
     @CursorField(value = Statuses.CARD, converter = LoganSquareCursorFieldConverter.class)
+    @Nullable
     public ParcelableCardEntity card;
 
     @JsonField(name = "extras")
@@ -314,7 +316,6 @@ public class ParcelableStatus implements Parcelable, Comparable<ParcelableStatus
     @JsonField(name = "quoted_spans")
     @CursorField(value = Statuses.QUOTED_SPANS, converter = LoganSquareCursorFieldConverter.class)
     public SpanItem[] quoted_spans;
-    public transient boolean is_filtered;
 
     @JsonField(name = "account_color")
     @CursorField(Statuses.ACCOUNT_COLOR)
@@ -323,13 +324,12 @@ public class ParcelableStatus implements Parcelable, Comparable<ParcelableStatus
     @CursorField(Statuses.INSERTED_DATE)
     public long inserted_date;
 
-
-    public boolean is_pinned_status;
-
     @FilterFlags
     @CursorField(Statuses.FILTER_FLAGS)
-
     public long filter_flags;
+
+    public transient boolean is_pinned_status;
+    public transient boolean is_filtered;
 
     public ParcelableStatus() {
     }
@@ -489,46 +489,46 @@ public class ParcelableStatus implements Parcelable, Comparable<ParcelableStatus
                 return new Extras[size];
             }
         };
+
         @JsonField(name = "external_url")
-
         public String external_url;
+
         @JsonField(name = "quoted_external_url")
-
         public String quoted_external_url;
+
         @JsonField(name = "retweeted_external_url")
-
         public String retweeted_external_url;
+
         @JsonField(name = "statusnet_conversation_id")
-
         public String statusnet_conversation_id;
+
         @JsonField(name = "support_entities")
-
         public boolean support_entities;
-        @JsonField(name = "user_profile_image_url_fallback")
 
+        @JsonField(name = "user_profile_image_url_fallback")
         @Nullable
         public String user_profile_image_url_fallback;
+
         @JsonField(name = "user_statusnet_profile_url")
-
         public String user_statusnet_profile_url;
-        @JsonField(name = "display_text_range")
 
+        @JsonField(name = "display_text_range")
         @Nullable
         public int[] display_text_range;
-        @JsonField(name = "quoted_display_text_range")
 
+        @JsonField(name = "quoted_display_text_range")
         @Nullable
         public int[] quoted_display_text_range;
-        @JsonField(name = "conversation_id")
 
+        @JsonField(name = "conversation_id")
         @Nullable
         public String conversation_id;
-        @JsonField(name = "summary_text")
 
+        @JsonField(name = "summary_text")
         @Nullable
         public String summary_text;
-        @JsonField(name = "visibility")
 
+        @JsonField(name = "visibility")
         @Nullable
         public String visibility;
 

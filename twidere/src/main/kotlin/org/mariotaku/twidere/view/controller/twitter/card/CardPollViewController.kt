@@ -121,7 +121,7 @@ class CardPollViewController : ContainerView.ViewController() {
         val hasChoice = selectedChoice != -1
         val isMyPoll = status.account_key == status.user_key
         val showResult = countsAreFinal || isMyPoll || hasChoice
-        for (i in 0..choicesCount - 1) {
+        for (i in 0 until choicesCount) {
             val choiceIndex = i + 1
             votesSum += card.getAsInteger("choice${choiceIndex}_count", 0)
         }
@@ -135,7 +135,7 @@ class CardPollViewController : ContainerView.ViewController() {
                     val pollItem = view.pollContainer.getChildAt(i)
                     pollItem.isClickable = false
                     clickedChoice = true
-                    val choiceRadioButton = pollItem.findViewById(R.id.choice_button) as RadioButton
+                    val choiceRadioButton: RadioButton = pollItem.findViewById(R.id.choice_button)
                     val checked = v === pollItem
                     choiceRadioButton.isChecked = checked
                     if (checked) {
@@ -178,12 +178,12 @@ class CardPollViewController : ContainerView.ViewController() {
 
         val color = ContextCompat.getColor(context, R.color.material_light_blue_a200)
         val radius = context.resources.getDimension(R.dimen.element_spacing_small)
-        for (i in 0..choicesCount - 1) {
+        for (i in 0 until choicesCount) {
             val pollItem = view.pollContainer.getChildAt(i)
 
-            val choicePercentView = pollItem.findViewById(R.id.choice_percent) as TextView
-            val choiceLabelView = pollItem.findViewById(R.id.choice_label) as TextView
-            val choiceRadioButton = pollItem.findViewById(R.id.choice_button) as RadioButton
+            val choicePercentView: TextView = pollItem.findViewById(R.id.choice_percent)
+            val choiceLabelView: TextView = pollItem.findViewById(R.id.choice_label)
+            val choiceRadioButton: RadioButton = pollItem.findViewById(R.id.choice_button)
 
             val choiceIndex = i + 1
             val label = card.getAsString("choice${choiceIndex}_label", null)

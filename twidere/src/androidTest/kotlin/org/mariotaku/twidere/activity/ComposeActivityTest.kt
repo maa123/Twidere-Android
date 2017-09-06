@@ -29,6 +29,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mariotaku.twidere.constant.IntentConstants.*
+import org.mariotaku.twidere.extension.set
 import org.mariotaku.twidere.model.ParcelableStatus
 import org.mariotaku.twidere.model.ParcelableStatusUpdate
 import org.mariotaku.twidere.test.R
@@ -54,15 +55,13 @@ class ComposeActivityTest {
         intent.putExtra(EXTRA_STATUS, status)
         intent.putExtra(EXTRA_SAVE_DRAFT, true)
         val activity = activityRule.launchActivity(intent)
-        val getStatusUpdate = activity.javaClass.getDeclaredMethod("getStatusUpdate").apply {
-            isAccessible = true
-        }
         activityRule.runOnUiThread {
             activity.editText.setText("@t_deyarmin @nixcraft @mariotaku Test Reply")
         }
-        val statusUpdate = getStatusUpdate(activity) as ParcelableStatusUpdate
+        val statusUpdate = activity.getStatusUpdateTest(false)
         Assert.assertEquals("Test Reply", statusUpdate.text)
         assertExcludedMatches(emptyArray(), statusUpdate)
+        activity.requestSkipDraft()
         activity.finish()
     }
 
@@ -76,15 +75,13 @@ class ComposeActivityTest {
         intent.putExtra(EXTRA_STATUS, status)
         intent.putExtra(EXTRA_SAVE_DRAFT, true)
         val activity = activityRule.launchActivity(intent)
-        val getStatusUpdate = activity.javaClass.getDeclaredMethod("getStatusUpdate").apply {
-            isAccessible = true
-        }
         activityRule.runOnUiThread {
             activity.editText.setText("@t_deyarmin Test Reply")
         }
-        val statusUpdate = getStatusUpdate(activity) as ParcelableStatusUpdate
+        val statusUpdate = activity.getStatusUpdateTest(false)
         Assert.assertEquals("Test Reply", statusUpdate.text)
         assertExcludedMatches(arrayOf("17484680", "57610574"), statusUpdate)
+        activity.requestSkipDraft()
         activity.finish()
     }
 
@@ -98,17 +95,15 @@ class ComposeActivityTest {
         intent.putExtra(EXTRA_STATUS, status)
         intent.putExtra(EXTRA_SAVE_DRAFT, true)
         val activity = activityRule.launchActivity(intent)
-        val getStatusUpdate = activity.javaClass.getDeclaredMethod("getStatusUpdate").apply {
-            isAccessible = true
-        }
         activityRule.runOnUiThread {
             activity.editText.setText("Test Reply")
         }
-        val statusUpdate = getStatusUpdate(activity) as ParcelableStatusUpdate
+        val statusUpdate = activity.getStatusUpdateTest(false)
         Assert.assertEquals("Test Reply", statusUpdate.text)
         Assert.assertEquals("https://twitter.com/t_deyarmin/status/847950697987493888",
                 statusUpdate.attachment_url)
         assertExcludedMatches(emptyArray(), statusUpdate)
+        activity.requestSkipDraft()
         activity.finish()
     }
 
@@ -122,15 +117,13 @@ class ComposeActivityTest {
         intent.putExtra(EXTRA_STATUS, status)
         intent.putExtra(EXTRA_SAVE_DRAFT, true)
         val activity = activityRule.launchActivity(intent)
-        val getStatusUpdate = activity.javaClass.getDeclaredMethod("getStatusUpdate").apply {
-            isAccessible = true
-        }
         activityRule.runOnUiThread {
             activity.editText.setText("@TwidereProject @mariotaku Test Reply")
         }
-        val statusUpdate = getStatusUpdate(activity) as ParcelableStatusUpdate
+        val statusUpdate = activity.getStatusUpdateTest(false)
         Assert.assertEquals("Test Reply", statusUpdate.text)
         assertExcludedMatches(emptyArray(), statusUpdate)
+        activity.requestSkipDraft()
         activity.finish()
     }
 
@@ -144,15 +137,13 @@ class ComposeActivityTest {
         intent.putExtra(EXTRA_STATUS, status)
         intent.putExtra(EXTRA_SAVE_DRAFT, true)
         val activity = activityRule.launchActivity(intent)
-        val getStatusUpdate = activity.javaClass.getDeclaredMethod("getStatusUpdate").apply {
-            isAccessible = true
-        }
         activityRule.runOnUiThread {
             activity.editText.setText("@TwidereProject Test Reply")
         }
-        val statusUpdate = getStatusUpdate(activity) as ParcelableStatusUpdate
+        val statusUpdate = activity.getStatusUpdateTest(false)
         Assert.assertEquals("Test Reply", statusUpdate.text)
         assertExcludedMatches(arrayOf("57610574"), statusUpdate)
+        activity.requestSkipDraft()
         activity.finish()
     }
 
@@ -166,16 +157,27 @@ class ComposeActivityTest {
         intent.putExtra(EXTRA_STATUS, status)
         intent.putExtra(EXTRA_SAVE_DRAFT, true)
         val activity = activityRule.launchActivity(intent)
-        val getStatusUpdate = activity.javaClass.getDeclaredMethod("getStatusUpdate").apply {
-            isAccessible = true
-        }
         activityRule.runOnUiThread {
             activity.editText.setText("Test Reply")
         }
-        val statusUpdate = getStatusUpdate(activity) as ParcelableStatusUpdate
+        val statusUpdate = activity.getStatusUpdateTest(false)
         Assert.assertEquals("Test Reply", statusUpdate.text)
         assertExcludedMatches(arrayOf("583328497", "57610574"), statusUpdate)
+        activity.requestSkipDraft()
         activity.finish()
+    }
+
+    private fun ComposeActivity.requestSkipDraft() {
+        val shouldSkipDraft = javaClass.getDeclaredField("shouldSkipDraft")
+        this[shouldSkipDraft] = true
+    }
+
+    private fun ComposeActivity.getStatusUpdateTest(checkLength: Boolean): ParcelableStatusUpdate {
+        val getStatusUpdate = javaClass.getDeclaredMethod("getStatusUpdate",
+                kotlin.Boolean::class.java).apply {
+            isAccessible = true
+        }
+        return getStatusUpdate(this, checkLength) as ParcelableStatusUpdate
     }
 
     private fun assertExcludedMatches(expectedIds: Array<String>, statusUpdate: ParcelableStatusUpdate): Boolean {

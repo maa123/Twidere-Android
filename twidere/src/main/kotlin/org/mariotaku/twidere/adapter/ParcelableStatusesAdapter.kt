@@ -190,6 +190,7 @@ abstract class ParcelableStatusesAdapter(
             changed = this.data != data
         }
         this.data = data
+        this.infoCache = if (data != null) arrayOfNulls(data.size) else null
         gapLoadingIds.clear()
         updateItemCount()
         notifyDataSetChanged()
@@ -439,8 +440,8 @@ abstract class ParcelableStatusesAdapter(
                 if (!cursor.safeMoveToPosition(dataPosition)) return defValue
                 val indices = data.indices
                 val _id = cursor.safeGetLong(indices[Statuses._ID])
-                val accountKey = UserKey.valueOf(cursor.getString(indices[Statuses.ACCOUNT_KEY]))
-                val id = cursor.getString(indices[Statuses.ID])
+                val accountKey = UserKey.valueOf(cursor.safeGetString(indices[Statuses.ACCOUNT_KEY]))
+                val id = cursor.safeGetString(indices[Statuses.ID])
                 val timestamp = cursor.safeGetLong(indices[Statuses.TIMESTAMP])
                 val sortId = cursor.safeGetLong(indices[Statuses.SORT_ID])
                 val positionKey = cursor.safeGetLong(indices[Statuses.POSITION_KEY])

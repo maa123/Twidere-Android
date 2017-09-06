@@ -24,6 +24,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.PorterDuff
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.support.v4.app.FragmentActivity
@@ -37,7 +38,7 @@ import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.Toolbar
 import android.view.*
-import com.bumptech.glide.Glide
+import com.bumptech.glide.RequestManager
 import com.squareup.otto.Subscribe
 import kotlinx.android.synthetic.main.activity_premium_dashboard.*
 import kotlinx.android.synthetic.main.fragment_messages_conversation.*
@@ -131,7 +132,7 @@ class MessagesConversationFragment : AbsContentListRecyclerViewFragment<Messages
         }
         adapter.listener = object : MessagesConversationAdapter.Listener {
             override fun onMediaClick(position: Int, media: ParcelableMedia, accountKey: UserKey?) {
-                val message = adapter.getMessage(position) ?: return
+                val message = adapter.getMessage(position)
                 IntentUtils.openMediaDirectly(context = context, accountKey = accountKey,
                         media = message.media, current = media,
                         newDocument = preferences[newDocumentApiKey], message = message)
@@ -141,7 +142,7 @@ class MessagesConversationFragment : AbsContentListRecyclerViewFragment<Messages
                 return recyclerView.showContextMenuForChild(holder.itemView)
             }
         }
-        mediaPreviewAdapter = MediaPreviewAdapter(context, Glide.with(this))
+        mediaPreviewAdapter = MediaPreviewAdapter(context, requestManager)
 
         mediaPreviewAdapter.listener = object : MediaPreviewAdapter.Listener {
             override fun onRemoveClick(position: Int, holder: MediaPreviewViewHolder) {
@@ -299,8 +300,8 @@ class MessagesConversationFragment : AbsContentListRecyclerViewFragment<Messages
         adapter.setData(null, null)
     }
 
-    override fun onCreateAdapter(context: Context): MessagesConversationAdapter {
-        return MessagesConversationAdapter(context, Glide.with(this))
+    override fun onCreateAdapter(context: Context, requestManager: RequestManager): MessagesConversationAdapter {
+        return MessagesConversationAdapter(context, this.requestManager)
     }
 
     override fun onCreateLayoutManager(context: Context): LinearLayoutManager {
@@ -314,7 +315,7 @@ class MessagesConversationFragment : AbsContentListRecyclerViewFragment<Messages
 
     override fun onLoadMoreContents(position: Long) {
         if (ILoadMoreSupportAdapter.START !in position) return
-        val message = adapter.getMessage(adapter.messageRange.endInclusive) ?: return
+        val message = adapter.getMessage(adapter.messageRange.endInclusive)
         setLoadMoreIndicatorPosition(position)
         val param = GetMessagesTask.LoadMoreMessageTaskParam(context, accountKey, conversationId,
                 message.id)
@@ -326,7 +327,7 @@ class MessagesConversationFragment : AbsContentListRecyclerViewFragment<Messages
         if (menuInfo !is ExtendedRecyclerView.ContextMenuInfo) return
         when (menuInfo.recyclerViewId) {
             R.id.recyclerView -> {
-                val message = adapter.getMessage(menuInfo.position) ?: return
+                val message = adapter.getMessage(menuInfo.position)
                 val conversation = adapter.conversation
                 menu.setHeaderTitle(message.getSummaryText(context, userColorNameManager, conversation,
                         preferences[nameFirstKey]))
@@ -345,7 +346,7 @@ class MessagesConversationFragment : AbsContentListRecyclerViewFragment<Messages
         }
         when (menuInfo.recyclerViewId) {
             R.id.recyclerView -> {
-                val message = adapter.getMessage(menuInfo.position) ?: return true
+                val message = adapter.getMessage(menuInfo.position)
                 when (item.itemId) {
                     R.id.copy -> {
                         ClipboardUtils.setText(context, message.text_unescaped)
@@ -377,6 +378,10 @@ class MessagesConversationFragment : AbsContentListRecyclerViewFragment<Messages
 
     override fun onSetAltText(position: Int, altText: String?) {
         mediaPreviewAdapter.setAltText(position, altText)
+    }
+
+    override fun onApplySystemWindowInsets(insets: Rect) {
+        view?.setPadding(insets.left, insets.top, insets.right, insets.bottom)
     }
 
     @Subscribe
@@ -442,9 +447,9 @@ class MessagesConversationFragment : AbsContentListRecyclerViewFragment<Messages
     private fun openMediaPicker() {
         val builder = ThemedMediaPickerActivity.withThemed(context)
         builder.pickSources(arrayOf(MediaPickerActivity.SOURCE_CAMERA,
-                        MediaPickerActivity.SOURCE_CAMCORDER,
-                        MediaPickerActivity.SOURCE_GALLERY,
-                        MediaPickerActivity.SOURCE_CLIPBOARD))
+                MediaPickerActivity.SOURCE_CAMCORDER,
+                MediaPickerActivity.SOURCE_GALLERY,
+                MediaPickerActivity.SOURCE_CLIPBOARD))
         if (gifShareProvider != null) {
             builder.addEntry(getString(R.string.action_add_gif), "gif", RESULT_SEARCH_GIF)
         }
@@ -513,7 +518,7 @@ class MessagesConversationFragment : AbsContentListRecyclerViewFragment<Messages
         TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(conversationTitle, null,
                 null, stateIcon, null)
 
-        Glide.with(this).loadProfileImage(context, conversation, preferences[profileImageStyleKey])
+        requestManager.loadProfileImage(context, conversation, preferences[profileImageStyleKey])
                 .into(conversationAvatar)
     }
 

@@ -21,9 +21,13 @@ package org.mariotaku.twidere.fragment
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Bundle
 import android.support.v4.app.DialogFragment
+import com.bumptech.glide.Glide
+import com.bumptech.glide.RequestManager
 import com.squareup.otto.Bus
 import com.twitter.Validator
+import okhttp3.Dns
 import org.mariotaku.kpreferences.KPreferences
 import org.mariotaku.restfu.http.RestHttpClient
 import org.mariotaku.twidere.util.AsyncTwitterWrapper
@@ -51,19 +55,40 @@ open class BaseDialogFragment : DialogFragment() {
     @Inject
     lateinit var bus: Bus
     @Inject
+    lateinit var dns: Dns
+    @Inject
     lateinit var extraFeaturesService: ExtraFeaturesService
     @Inject
     lateinit var restHttpClient: RestHttpClient
 
-    override fun onAttach(context: Context?) {
-        super.onAttach(context)
-        GeneralComponent.get(context!!).inject(this)
+    lateinit var requestManager: RequestManager
+        private set
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        requestManager = Glide.with(this)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        requestManager.onStart()
+    }
+
+    override fun onStop() {
+        requestManager.onStop()
+        super.onStop()
     }
 
     override fun onDestroy() {
+        requestManager.onDestroy()
         extraFeaturesService.release()
         super.onDestroy()
         DebugModeUtils.watchReferenceLeak(this)
+    }
+
+    override fun onAttach(context: Context?) {
+        super.onAttach(context)
+        GeneralComponent.get(context!!).inject(this)
     }
 
 }

@@ -40,12 +40,9 @@ import org.mariotaku.twidere.alias.MastodonStatusUpdate
 import org.mariotaku.twidere.annotation.AccountType
 import org.mariotaku.twidere.app.TwidereApplication
 import org.mariotaku.twidere.extension.calculateInSampleSize
+import org.mariotaku.twidere.extension.model.*
 import org.mariotaku.twidere.extension.model.api.mastodon.toParcelable
 import org.mariotaku.twidere.extension.model.api.toParcelable
-import org.mariotaku.twidere.extension.model.applyUpdateStatus
-import org.mariotaku.twidere.extension.model.getMediaSizeLimit
-import org.mariotaku.twidere.extension.model.newMicroBlogInstance
-import org.mariotaku.twidere.extension.model.textLimit
 import org.mariotaku.twidere.extension.text.twitter.getTweetLength
 import org.mariotaku.twidere.model.*
 import org.mariotaku.twidere.model.account.AccountExtras
@@ -196,7 +193,7 @@ class UpdateStatusTask(
         }
 
         val sharedMedia = HashMap<UserKey, MediaUploadResult>()
-        for (i in 0..pending.length - 1) {
+        for (i in 0 until pending.length) {
             val account = update.accounts[i]
             // Skip upload if shared media found
             val accountKey = account.key
@@ -360,7 +357,7 @@ class UpdateStatusTask(
         val ownerIds = ownersList.map {
             it.id
         }.toTypedArray()
-        for (i in 0..pendingUpdate.length - 1) {
+        for (i in 0 until pendingUpdate.length) {
             val account = update.accounts[i]
             val mediaIds: Array<String>?
             when (account.type) {
@@ -454,7 +451,7 @@ class UpdateStatusTask(
 
         val details = statusUpdate.accounts[index]
         if (statusUpdate.draft_action == Draft.Action.REPLY && inReplyToStatus != null) {
-            status.inReplyToId(inReplyToStatus.id)
+            status.inReplyToId(inReplyToStatus.originalId)
         }
         val mediaIds = pendingUpdate.mediaIds[index]
         if (mediaIds != null) {
@@ -475,7 +472,7 @@ class UpdateStatusTask(
     private fun statusShortenCallback(shortener: StatusShortenerInterface?,
             pendingUpdate: PendingStatusUpdate, updateResult: UpdateStatusResult) {
         if (shortener == null || !shortener.waitForService()) return
-        for (i in 0..pendingUpdate.length - 1) {
+        for (i in 0 until pendingUpdate.length) {
             val shortenResult = pendingUpdate.statusShortenResults[i]
             val status = updateResult.statuses[i]
             if (shortenResult == null || status == null) continue
@@ -486,7 +483,7 @@ class UpdateStatusTask(
     private fun mediaUploadCallback(uploader: MediaUploaderInterface?,
             pendingUpdate: PendingStatusUpdate, updateResult: UpdateStatusResult) {
         if (uploader == null || !uploader.waitForService()) return
-        for (i in 0..pendingUpdate.length - 1) {
+        for (i in 0 until pendingUpdate.length) {
             val uploadResult = pendingUpdate.mediaUploadResults[i]
             val status = updateResult.statuses[i]
             if (uploadResult == null || status == null) continue
@@ -717,10 +714,10 @@ class UpdateStatusTask(
                             ContentLengthInputStream.ReadListener { length, position ->
                                 callback?.onUploadingProgressChanged(index, position, length)
                             })
-                    if (chucked) {
-                        resp = uploadMediaChucked(upload, body.body, mediaCategory, ownerIds)
+                    resp = if (chucked) {
+                        uploadMediaChucked(upload, body.body, mediaCategory, ownerIds)
                     } else {
-                        resp = upload.uploadMedia(body.body, ownerIds)
+                        upload.uploadMedia(body.body, ownerIds)
                     }
                 } catch (e: IOException) {
                     throw UploadException(e).apply {
@@ -735,7 +732,7 @@ class UpdateStatusTask(
                 }
                 body?.deleteOnSuccess?.addAllTo(deleteOnSuccess)
                 body?.deleteAlways?.addAllTo(deleteAlways)
-                if (media.alt_text?.isNotEmpty() ?: false) {
+                if (media.alt_text?.isNotEmpty() == true) {
                     try {
                         upload.createMetadata(NewMediaMetadata(resp.id, media.alt_text))
                     } catch (e: MicroBlogException) {
@@ -848,7 +845,7 @@ class UpdateStatusTask(
             val stream = body.stream()
             var response = upload.initUploadMedia(mediaType, length, mediaCategory, ownerIds)
             val segments = if (length == 0L) 0 else (length / BULK_SIZE + 1).toInt()
-            for (segmentIndex in 0..segments - 1) {
+            for (segmentIndex in 0 until segments) {
                 val currentBulkSize = Math.min(BULK_SIZE.toLong(), length - segmentIndex * BULK_SIZE).toInt()
                 val bulk = SimpleBody(ContentType.OCTET_STREAM, null, currentBulkSize.toLong(),
                         stream)
@@ -920,9 +917,14 @@ class UpdateStatusTask(
             o.inSampleSize = o.calculateInSampleSize(imageLimit.maxWidth, imageLimit.maxHeight)
             o.inJustDecodeBounds = false
             // Do actual image decoding
-            val bitmap = context.contentResolver.openInputStream(mediaUri).use {
-                BitmapFactory.decodeStream(it, null, o)
-            } ?: return null
+            val bitmap = try {
+                context.contentResolver.openInputStream(mediaUri).use {
+                    BitmapFactory.decodeStream(it, null, o)
+                } ?: return null
+            } catch (oome: OutOfMemoryError) {
+                Analyzer.logException(OutOfMemoryError("OOM Image size: $imageSize, width: ${o.outWidth}, height: ${o.outHeight}, type: ${o.outMimeType}"))
+                return null
+            }
 
             val size = Point(bitmap.width, bitmap.height)
             val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mediaType)
@@ -993,7 +995,9 @@ class UpdateStatusTask(
                 geometry.x = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH).toIntOr(-1)
                 geometry.y = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT).toIntOr(-1)
                 duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION).toLongOr(-1)
-                framerate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE).toDoubleOr(-1.0)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    framerate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE).toDoubleOr(-1.0)
+                }
 
                 size = resolver.openFileDescriptor(mediaUri, "r").use { it.statSize }
             } catch (e: Exception) {

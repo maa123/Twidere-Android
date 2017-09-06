@@ -13,7 +13,6 @@ import android.view.*
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
-import com.bumptech.glide.Glide
 import com.bumptech.glide.RequestManager
 import kotlinx.android.synthetic.main.activity_premium_dashboard.*
 import kotlinx.android.synthetic.main.card_item_extra_feature.view.*
@@ -22,10 +21,14 @@ import nl.komponents.kovenant.task
 import nl.komponents.kovenant.ui.alwaysUi
 import nl.komponents.kovenant.ui.failUi
 import nl.komponents.kovenant.ui.successUi
+import org.mariotaku.kpreferences.get
+import org.mariotaku.kpreferences.set
+import org.mariotaku.ktextension.setItemAvailability
 import org.mariotaku.twidere.BuildConfig
 import org.mariotaku.twidere.R
 import org.mariotaku.twidere.TwidereConstants.REQUEST_PURCHASE_EXTRA_FEATURES
 import org.mariotaku.twidere.adapter.BaseRecyclerViewAdapter
+import org.mariotaku.twidere.constant.promotionsEnabledKey
 import org.mariotaku.twidere.fragment.ProgressDialogFragment
 import org.mariotaku.twidere.model.analyzer.PurchaseFinished
 import org.mariotaku.twidere.util.Analyzer
@@ -44,7 +47,7 @@ class PremiumDashboardActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_premium_dashboard)
-        adapter = ControllersAdapter(this, Glide.with(this))
+        adapter = ControllersAdapter(this, requestManager)
         recyclerView.adapter = adapter
         recyclerView.layoutManager = LinearLayoutManager(this)
         if (extraFeaturesService.isSupported()) {
@@ -76,6 +79,10 @@ class PremiumDashboardActivity : BaseActivity() {
 
     override fun onDestroy() {
         extraFeaturesService.release()
+        if (isFinishing) {
+            // Make sure promotionsEnabled set
+            preferences[promotionsEnabledKey] = preferences[promotionsEnabledKey]
+        }
         super.onDestroy()
     }
 
@@ -100,6 +107,12 @@ class PremiumDashboardActivity : BaseActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         super.onCreateOptionsMenu(menu)
         menuInflater.inflate(R.menu.menu_premium_dashboard, menu)
+        return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        super.onPrepareOptionsMenu(menu)
+        menu.setItemAvailability(R.id.disable_promotions, preferences[promotionsEnabledKey])
         return true
     }
 
@@ -137,6 +150,10 @@ class PremiumDashboardActivity : BaseActivity() {
                     }
                 }
             }
+            R.id.disable_promotions -> {
+                preferences[promotionsEnabledKey] = false
+                recreate()
+            }
         }
         return true
     }
@@ -157,11 +174,11 @@ class PremiumDashboardActivity : BaseActivity() {
     }
 
     open class ExtraFeatureViewController : ContainerView.ViewController() {
-        protected val titleView by lazy { view.findViewById(R.id.title) as TextView }
-        protected val messageView by lazy { view.findViewById(R.id.message) as TextView }
-        protected val button1 by lazy { view.findViewById(R.id.button1) as Button }
+        protected val titleView: TextView by lazy { view.findViewById<TextView>(R.id.title) }
+        protected val messageView: TextView by lazy { view.findViewById<TextView>(R.id.message) }
+        protected val button1: Button by lazy { view.findViewById<Button>(R.id.button1) }
+        protected val button2: Button  by lazy { view.findViewById<Button>(R.id.button2) }
 
-        protected val button2 by lazy { view.findViewById(R.id.button2) as Button }
         @Inject
         protected lateinit var extraFeaturesService: ExtraFeaturesService
 

@@ -39,36 +39,40 @@ interface IBaseFragment<out F : Fragment> {
     val tabId: Long
         get() = (this as Fragment).arguments?.getLong(IntentConstants.EXTRA_TAB_ID, -1L) ?: -1L
 
-    fun requestFitSystemWindows() {
-        val fragment = this as Fragment
-        val activity = fragment.activity
-        val parentFragment = fragment.parentFragment
-        val callback: IBaseFragment.SystemWindowsInsetsCallback
-        if (parentFragment is IBaseFragment.SystemWindowsInsetsCallback) {
-            callback = parentFragment
-        } else if (activity is IBaseFragment.SystemWindowsInsetsCallback) {
-            callback = activity
-        } else {
-            return
+    val insetsCallback: SystemWindowInsetsCallback?
+        get() {
+            val fragment = this as Fragment
+            val activity = fragment.activity
+            val parentFragment = fragment.parentFragment
+            if (parentFragment is SystemWindowInsetsCallback) {
+                return parentFragment
+            } else if (activity is SystemWindowInsetsCallback) {
+                return activity
+            }
+            return null
         }
+
+    fun requestApplyInsets() {
+        val fragment = this as Fragment
+        val callback = insetsCallback ?: return
         val insets = Rect()
-        if (callback.getSystemWindowsInsets(insets)) {
-            fitSystemWindows(insets)
+        if (callback.getSystemWindowInsets(fragment, insets)) {
+            onApplySystemWindowInsets(insets)
         }
     }
 
-    fun fitSystemWindows(insets: Rect) {
-        val fragment = this as Fragment
-        fragment.view?.setPadding(insets.left, insets.top, insets.right, insets.bottom)
+    fun onApplySystemWindowInsets(insets: Rect) {
+        this as Fragment
+        view?.setPadding(insets.left, insets.top, insets.right, insets.bottom)
     }
 
-    interface SystemWindowsInsetsCallback {
-        fun getSystemWindowsInsets(insets: Rect): Boolean
+    interface SystemWindowInsetsCallback {
+        fun getSystemWindowInsets(caller: Fragment, insets: Rect): Boolean
     }
 
     fun executeAfterFragmentResumed(useHandler: Boolean = false, action: (F) -> Unit): Promise<Unit, Exception>
 
-    class ActionHelper<out F : Fragment>(private val fragment: F) {
+    class ActionHelper<F : Fragment> {
 
         private val handler: Handler = Handler(Looper.getMainLooper())
 
@@ -79,32 +83,31 @@ interface IBaseFragment<out F : Fragment> {
             fragmentResumed = false
         }
 
-        fun dispatchOnResumeFragments() {
+        fun dispatchOnResumeFragments(fragment: F) {
             fragmentResumed = true
-            executePending()
+            executePending(fragment)
         }
 
-        private fun executePending() {
+        private fun executePending(fragment: F) {
             if (!fragmentResumed) return
             var info: ExecuteInfo<F>?
             do {
-                val cur = actionQueue.poll()
-                cur?.let { cur ->
-                    if (cur.useHandler) {
-                        handler.post { cur.invoke(fragment) }
+                info = actionQueue.poll()
+                info?.let { i ->
+                    if (i.useHandler) {
+                        handler.post { i.invoke(fragment) }
                     } else {
-                        cur.invoke(fragment)
+                        i.invoke(fragment)
                     }
                 }
-                info = cur
             } while (info != null)
         }
 
-        fun executeAfterFragmentResumed(useHandler: Boolean = false, action: (F) -> Unit)
+        fun executeAfterFragmentResumed(fragment: F, useHandler: Boolean = false, action: (F) -> Unit)
                 : Promise<Unit, Exception> {
             val info = ExecuteInfo(action, useHandler)
             actionQueue.add(info)
-            executePending()
+            executePending(fragment)
             return info.promise
         }
 

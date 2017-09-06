@@ -41,7 +41,6 @@ import org.mariotaku.twidere.adapter.iface.IActivitiesAdapter
 import org.mariotaku.twidere.adapter.iface.IGapSupportedAdapter
 import org.mariotaku.twidere.adapter.iface.IItemCountsAdapter
 import org.mariotaku.twidere.adapter.iface.ILoadMoreSupportAdapter
-import org.mariotaku.twidere.annotation.Referral
 import org.mariotaku.twidere.constant.newDocumentApiKey
 import org.mariotaku.twidere.exception.UnsupportedCountIndexException
 import org.mariotaku.twidere.extension.model.activityStatus
@@ -176,7 +175,7 @@ class ParcelableActivitiesAdapter(
             filteredUserKeys = data.filteredUserIds
         }
         this.data = data
-        infoCache = if (data != null) arrayOfNulls(data.size) else null
+        this.infoCache = if (data != null) arrayOfNulls(data.size) else null
         gapLoadingIds.clear()
         updateItemCount()
         notifyDataSetChanged()
@@ -421,11 +420,10 @@ class ParcelableActivitiesAdapter(
 
     internal class StubViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
-        internal val text1 = itemView.findViewById(android.R.id.text1) as TextView
-        internal val text2 = itemView.findViewById(android.R.id.text2) as TextView
+        internal val text1 = itemView.findViewById<TextView>(android.R.id.text1)
+        internal val text2 = itemView.findViewById<TextView>(android.R.id.text2)
 
         init {
-
             text2.setSingleLine(false)
         }
 
@@ -470,7 +468,7 @@ class ParcelableActivitiesAdapter(
             val status = adapter.getActivity(position).activityStatus ?: return
             IntentUtils.openUserProfile(adapter.context, status.account_key, status.user_key,
                     status.user_screen_name, status.extras?.user_statusnet_profile_url,
-                    adapter.preferences[newDocumentApiKey], Referral.TIMELINE_STATUS, null)
+                    adapter.preferences[newDocumentApiKey], null)
         }
 
         override fun onStatusClick(holder: IStatusViewHolder, position: Int) {

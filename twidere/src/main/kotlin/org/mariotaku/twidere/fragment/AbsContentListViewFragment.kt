@@ -52,6 +52,9 @@ abstract class AbsContentListViewFragment<A : ListAdapter> : BaseFragment(),
     protected open val overrideDivider: Drawable?
         get() = ThemeUtils.getDrawableFromThemeAttribute(context, android.R.attr.listDivider)
 
+    protected val isProgressShowing: Boolean
+        get() = progressContainer.visibility == View.VISIBLE
+
     override lateinit var adapter: A
 
 
@@ -96,7 +99,7 @@ abstract class AbsContentListViewFragment<A : ListAdapter> : BaseFragment(),
         setRefreshEnabled(false)
     }
 
-    override fun onAttach(context: Context?) {
+    override fun onAttach(context: Context) {
         super.onAttach(context)
         if (context is IControlBarActivity) {
             context.registerControlBarOffsetListener(this)
@@ -149,7 +152,7 @@ abstract class AbsContentListViewFragment<A : ListAdapter> : BaseFragment(),
         super.onStop()
     }
 
-    override fun fitSystemWindows(insets: Rect) {
+    override fun onApplySystemWindowInsets(insets: Rect) {
         listView.setPadding(insets.left, insets.top, insets.right, insets.bottom)
         errorContainer.setPadding(insets.left, insets.top, insets.right, insets.bottom)
         progressContainer.setPadding(insets.left, insets.top, insets.right, insets.bottom)

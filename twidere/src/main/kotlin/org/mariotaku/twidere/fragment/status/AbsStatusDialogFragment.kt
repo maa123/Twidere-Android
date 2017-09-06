@@ -29,7 +29,6 @@ import android.support.v7.app.AlertDialog
 import android.support.v7.app.AlertDialog.Builder
 import android.view.View
 import android.widget.Toast
-import com.bumptech.glide.Glide
 import nl.komponents.kovenant.Promise
 import nl.komponents.kovenant.combine.and
 import nl.komponents.kovenant.task
@@ -43,6 +42,7 @@ import org.mariotaku.twidere.constant.IntentConstants.*
 import org.mariotaku.twidere.extension.applyTheme
 import org.mariotaku.twidere.extension.model.api.toParcelable
 import org.mariotaku.twidere.extension.model.newMicroBlogInstance
+import org.mariotaku.twidere.extension.onShow
 import org.mariotaku.twidere.fragment.BaseDialogFragment
 import org.mariotaku.twidere.model.AccountDetails
 import org.mariotaku.twidere.model.ParcelableStatus
@@ -73,22 +73,22 @@ abstract class AbsStatusDialogFragment : BaseDialogFragment() {
 
         builder.setupAlertDialog()
 
-        adapter = DummyItemAdapter(context, requestManager = Glide.with(this))
+        adapter = DummyItemAdapter(context, requestManager = requestManager)
         adapter.showCardActions = false
         adapter.showAccountsColor = true
 
         val dialog = builder.create()
-        dialog.setOnShowListener { dialog ->
-            dialog as AlertDialog
-            dialog.applyTheme()
+        dialog.onShow {
+            val context = it.context ?: return@onShow
+            it.applyTheme()
 
             val am = AccountManager.get(context)
             val details = AccountUtils.getAccountDetails(am, accountKey, true) ?: run {
                 dismiss()
-                return@setOnShowListener
+                return@onShow
             }
             val weakThis = WeakReference(this)
-            val weakHolder = WeakReference(StatusViewHolder(adapter = adapter, itemView = dialog.itemContent).apply {
+            val weakHolder = WeakReference(StatusViewHolder(adapter = adapter, itemView = it.itemContent).apply {
                 setupViewOptions()
             })
             val extraStatus = status

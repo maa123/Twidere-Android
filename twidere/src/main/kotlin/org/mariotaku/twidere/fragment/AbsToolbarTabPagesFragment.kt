@@ -6,6 +6,7 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v4.app.FragmentActivity
+import android.support.v4.view.OnApplyWindowInsetsListener
 import android.support.v4.view.ViewPager.OnPageChangeListener
 import android.support.v7.widget.Toolbar
 import android.view.KeyEvent
@@ -28,13 +29,15 @@ import org.mariotaku.twidere.fragment.iface.RefreshScrollTopInterface
 import org.mariotaku.twidere.fragment.iface.SupportFragmentCallback
 import org.mariotaku.twidere.util.KeyboardShortcutsHandler
 import org.mariotaku.twidere.util.KeyboardShortcutsHandler.KeyboardShortcutCallback
+import org.mariotaku.twidere.util.ThemeUtils
 import org.mariotaku.twidere.view.TabPagerIndicator
+import org.mariotaku.twidere.view.iface.IExtendedView
 
 /**
  * Created by mariotaku on 16/3/16.
  */
 abstract class AbsToolbarTabPagesFragment : BaseFragment(), RefreshScrollTopInterface,
-        SupportFragmentCallback, IBaseFragment.SystemWindowsInsetsCallback, ControlBarOffsetListener,
+        SupportFragmentCallback, IBaseFragment.SystemWindowInsetsCallback, ControlBarOffsetListener,
         HideUiOnScroll, OnPageChangeListener, IToolBarSupportFragment, KeyboardShortcutCallback {
 
     protected lateinit var pagerAdapter: SupportTabsAdapter
@@ -51,22 +54,29 @@ abstract class AbsToolbarTabPagesFragment : BaseFragment(), RefreshScrollTopInte
         toolbarTabs.setViewPager(viewPager)
         toolbarTabs.setTabDisplayOption(TabPagerIndicator.DisplayOption.LABEL)
 
+        tabPagesFragmentView.applyWindowInsetsListener = OnApplyWindowInsetsListener listener@ { _, insets ->
+            val top = insets.systemWindowInsetTop
+            tabPagesFragmentView.setPadding(0, top, 0, 0)
+            return@listener insets
+        }
 
         addTabs(pagerAdapter)
         toolbarTabs.notifyDataSetChanged()
-
-        toolbarContainer.setOnSizeChangedListener { _, _, _, _, _ ->
-            val pageLimit = viewPager.offscreenPageLimit
-            val currentItem = viewPager.currentItem
-            val count = pagerAdapter.count
-            for (i in 0 until count) {
-                if (i > currentItem - pageLimit - 1 || i < currentItem + pageLimit) {
-                    val obj = pagerAdapter.instantiateItem(viewPager, i)
-                    if (obj is IBaseFragment<*>) {
-                        obj.requestFitSystemWindows()
+        toolbarContainer.onSizeChangedListener = object : IExtendedView.OnSizeChangedListener {
+            override fun onSizeChanged(view: View, w: Int, h: Int, oldw: Int, oldh: Int) {
+                val pageLimit = viewPager.offscreenPageLimit
+                val currentItem = viewPager.currentItem
+                val count = pagerAdapter.count
+                for (i in 0 until count) {
+                    if (i > currentItem - pageLimit - 1 || i < currentItem + pageLimit) {
+                        val obj = pagerAdapter.instantiateItem(viewPager, i)
+                        if (obj is IBaseFragment<*>) {
+                            obj.requestApplyInsets()
+                        }
                     }
                 }
             }
+
         }
 
         if (savedInstanceState == null) {
@@ -84,7 +94,7 @@ abstract class AbsToolbarTabPagesFragment : BaseFragment(), RefreshScrollTopInte
 
     protected abstract fun addTabs(adapter: SupportTabsAdapter)
 
-    override fun onAttach(context: Context?) {
+    override fun onAttach(context: Context) {
         super.onAttach(context)
         if (context is IControlBarActivity) {
             context.registerControlBarOffsetListener(this)
@@ -131,12 +141,17 @@ abstract class AbsToolbarTabPagesFragment : BaseFragment(), RefreshScrollTopInte
         return false
     }
 
-    override fun fitSystemWindows(insets: Rect) {
+    override fun onApplySystemWindowInsets(insets: Rect) {
     }
 
-    override fun getSystemWindowsInsets(insets: Rect): Boolean {
-        if (toolbarTabs == null) return false
-        insets.set(0, toolbarContainer.height, 0, 0)
+    override fun getSystemWindowInsets(caller: Fragment, insets: Rect): Boolean {
+        insetsCallback?.getSystemWindowInsets(this, insets)
+        val height = toolbarContainer.height
+        if (height != 0) {
+            insets.top = height
+        } else {
+            insets.top = ThemeUtils.getActionBarHeight(context)
+        }
         return true
     }
 

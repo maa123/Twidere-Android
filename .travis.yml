@@ -1,6 +1,7 @@
 language: android
 
-sudo: required
+sudo: false
+dist: trusty
 
 jdk: oraclejdk8
 
@@ -9,13 +10,8 @@ android:
     - tools
     - tools # To fix https://github.com/travis-ci/travis-ci/issues/6040
     - platform-tools
-    - build-tools-25.0.3
-    - android-25
-
-    # Additional components
-    - extra-google-google_play_services
-    - extra-google-m2repository
-    - extra-android-m2repository
+    - build-tools-26.0.1
+    - android-26
 
   licenses:
     - 'android-sdk-preview-license-.+'
@@ -47,10 +43,13 @@ cache:
     - $HOME/.m2/
 
 before_install:
+  - yes y | $ANDROID_HOME/tools/bin/sdkmanager --update
+  - yes y | $ANDROID_HOME/tools/bin/sdkmanager --licenses
   - ./travis/scripts/decode_private_configs.sh
 
 install:
   - ./travis/scripts/fetch_private_files.sh
+  - cat ./travis/configs/gradle.properties > ./gradle.properties
 
 before_script:
   # Validate if patches work
@@ -76,7 +75,11 @@ deploy:
       tags: true
   # Publish to Google Play store
   - provider: script
-    script: ./gradlew publishGoogleRelease
+    script:
+      - set -o allexport
+      - source ./twidere/src/google/.supplyrc
+      - fastlane supply run
+      - set +o allexport
     on:
       repo: TwidereProject/Twidere-Android
       tags: true

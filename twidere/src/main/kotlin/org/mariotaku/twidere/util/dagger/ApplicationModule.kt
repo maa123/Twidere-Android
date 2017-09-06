@@ -46,6 +46,7 @@ import org.mariotaku.mediaviewer.library.FileCache
 import org.mariotaku.mediaviewer.library.MediaDownloader
 import org.mariotaku.restfu.http.RestHttpClient
 import org.mariotaku.twidere.Constants
+import org.mariotaku.twidere.app.TwidereApplication
 import org.mariotaku.twidere.constant.SharedPreferenceConstants.KEY_CACHE_SIZE_LIMIT
 import org.mariotaku.twidere.constant.autoRefreshCompatibilityModeKey
 import org.mariotaku.twidere.extension.model.load
@@ -58,6 +59,7 @@ import org.mariotaku.twidere.util.media.MediaPreloader
 import org.mariotaku.twidere.util.media.ThumborWrapper
 import org.mariotaku.twidere.util.media.TwidereMediaDownloader
 import org.mariotaku.twidere.util.net.TwidereDns
+import org.mariotaku.twidere.util.notification.ContentNotificationManager
 import org.mariotaku.twidere.util.premium.ExtraFeaturesService
 import org.mariotaku.twidere.util.refresh.AutoRefreshController
 import org.mariotaku.twidere.util.refresh.JobSchedulerAutoRefreshController
@@ -192,8 +194,7 @@ class ApplicationModule(private val context: Context) {
 
     @Provides
     @Singleton
-    fun mediaDownloader(preferences: SharedPreferences, client: RestHttpClient,
-            thumbor: ThumborWrapper): MediaDownloader {
+    fun mediaDownloader(client: RestHttpClient, thumbor: ThumborWrapper): MediaDownloader {
         return TwidereMediaDownloader(context, client, thumbor)
     }
 
@@ -366,15 +367,12 @@ class ApplicationModule(private val context: Context) {
 
     companion object {
 
-        private var instance: ApplicationModule? = null
-
         fun get(context: Context): ApplicationModule {
-
-            return instance ?: run {
-                val module = ApplicationModule(context.applicationContext)
-                instance = module
-                return@run module
+            val appContext = context.applicationContext
+            if (appContext is TwidereApplication) {
+                return appContext.applicationModule
             }
+            return ApplicationModule(appContext)
         }
     }
 }

@@ -19,6 +19,7 @@ import org.mariotaku.twidere.annotation.AccountType
 import org.mariotaku.twidere.constant.IntentConstants.EXTRA_API_CONFIG
 import org.mariotaku.twidere.constant.defaultAPIConfigKey
 import org.mariotaku.twidere.extension.applyTheme
+import org.mariotaku.twidere.extension.onShow
 import org.mariotaku.twidere.extension.setSelectedItem
 import org.mariotaku.twidere.loader.DefaultAPIConfigLoader
 import org.mariotaku.twidere.model.CustomAPIConfig
@@ -28,15 +29,15 @@ import org.mariotaku.twidere.util.view.ConsumerKeySecretValidator
 
 class APIEditorDialogFragment : BaseDialogFragment() {
 
-    private val loadDefaults by lazy { dialog.findViewById(R.id.loadDefaults) }
-    private val editAPIUrlFormat by lazy { dialog.findViewById(R.id.editApiUrlFormat) as EditText }
-    private val editSameOAuthSigningUrl by lazy { dialog.findViewById(R.id.editSameOAuthSigningUrl) as CheckBox }
-    private val editNoVersionSuffix by lazy { dialog.findViewById(R.id.editNoVersionSuffix) as CheckBox }
-    private val editConsumerKey by lazy { dialog.findViewById(R.id.editConsumerKey) as MaterialEditText }
-    private val editConsumerSecret by lazy { dialog.findViewById(R.id.editConsumerSecret) as MaterialEditText }
-    private val editAuthType by lazy { dialog.findViewById(R.id.editAuthType) as RadioGroup }
-    private val apiFormatHelpButton by lazy { dialog.findViewById(R.id.apiUrlFormatHelp) }
-    private val accountTypeSpinner by lazy { dialog.findViewById(R.id.accountTypeSpinner) as Spinner }
+    private val loadDefaults by lazy { dialog.findViewById<View>(R.id.loadDefaults) }
+    private val editAPIUrlFormat by lazy { dialog.findViewById<EditText>(R.id.editApiUrlFormat) }
+    private val editSameOAuthSigningUrl by lazy { dialog.findViewById<CheckBox>(R.id.editSameOAuthSigningUrl) }
+    private val editNoVersionSuffix by lazy { dialog.findViewById<CheckBox>(R.id.editNoVersionSuffix) }
+    private val editConsumerKey by lazy { dialog.findViewById<MaterialEditText>(R.id.editConsumerKey) }
+    private val editConsumerSecret by lazy { dialog.findViewById<MaterialEditText>(R.id.editConsumerSecret) }
+    private val editAuthType by lazy { dialog.findViewById<RadioGroup>(R.id.editAuthType) }
+    private val apiFormatHelpButton by lazy { dialog.findViewById<View>(R.id.apiUrlFormatHelp) }
+    private val accountTypeSpinner by lazy { dialog.findViewById<Spinner>(R.id.accountTypeSpinner) }
 
     private var editNoVersionSuffixChanged: Boolean = false
     private lateinit var apiConfig: CustomAPIConfig
@@ -61,8 +62,7 @@ class APIEditorDialogFragment : BaseDialogFragment() {
         builder.setNegativeButton(android.R.string.cancel, null)
 
         val dialog = builder.create()
-        dialog.setOnShowListener {
-            it as AlertDialog
+        dialog.onShow {
             it.applyTheme()
             if (arguments?.getBoolean(EXTRA_SHOW_LOAD_DEFAULTS) ?: false) {
                 loadDefaults.visibility = View.VISIBLE
@@ -150,10 +150,7 @@ class APIEditorDialogFragment : BaseDialogFragment() {
             builder.setAdapter(adapter, this)
             loaderManager.initLoader(0, null, this)
             val dialog = builder.create()
-            dialog.setOnShowListener {
-                it as AlertDialog
-                it.applyTheme()
-            }
+            dialog.onShow { it.applyTheme() }
             return dialog
         }
 
@@ -183,7 +180,7 @@ class APIEditorDialogFragment : BaseDialogFragment() {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getView(position, convertView, parent)
                 val type = getItem(position)
-                (view.findViewById(android.R.id.text1) as TextView).text = type.getLocalizedName(context)
+                view.findViewById<TextView>(android.R.id.text1).text = type.getLocalizedName(context)
                 return view
             }
 
@@ -193,7 +190,7 @@ class APIEditorDialogFragment : BaseDialogFragment() {
     private class AccountTypeSpinnerAdapter(
             fragment: APIEditorDialogFragment
     ) : BaseArrayAdapter<String>(fragment.context, R.layout.support_simple_spinner_dropdown_item,
-            requestManager = Glide.with(fragment)) {
+            requestManager = fragment.requestManager) {
         init {
             add(AccountType.TWITTER)
             add(AccountType.FANFOU)
@@ -203,14 +200,14 @@ class APIEditorDialogFragment : BaseDialogFragment() {
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
             val view = super.getView(position, convertView, parent)
-            val textView = view.findViewById(android.R.id.text1) as TextView
+            val textView = view.findViewById<TextView>(android.R.id.text1)
             textView.text = getTypeTitle(context, getItem(position))
             return view
         }
 
         override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup?): View {
             val view = super.getDropDownView(position, convertView, parent)
-            val textView = view.findViewById(android.R.id.text1) as TextView
+            val textView = view.findViewById<TextView>(android.R.id.text1)
             textView.text = getTypeTitle(context, getItem(position))
             return view
         }

@@ -21,12 +21,14 @@ package org.mariotaku.twidere.util
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.res.ColorStateList
 import android.content.res.Resources
 import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.os.Build
+import android.support.annotation.AttrRes
 import android.support.annotation.ColorInt
 import android.support.annotation.StyleRes
 import android.support.v4.content.ContextCompat
@@ -369,8 +371,8 @@ object ThemeUtils {
 
     fun setCompatContentViewOverlay(window: Window, overlay: Drawable?) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) return
-        val contentLayout = window.findViewById(android.support.v7.appcompat.R.id.action_bar_activity_content)
-                ?: window.findViewById(android.R.id.content) as? FrameLayout ?: return
+        val contentLayout = window.findViewById<FrameLayout>(android.support.v7.appcompat.R.id.action_bar_activity_content)
+                ?: window.findViewById<FrameLayout>(android.R.id.content) ?: return
         ViewSupport.setForeground(contentLayout, overlay)
     }
 
@@ -448,7 +450,7 @@ object ThemeUtils {
         }
     }
 
-    fun getColorFromAttribute(context: Context, attr: Int, styleRes: Int = 0, def: Int = 0): Int {
+    fun getColorFromAttribute(context: Context, @AttrRes attr: Int, styleRes: Int = 0, def: Int = 0): Int {
         val a = context.obtainStyledAttributes(null, intArrayOf(attr), 0, styleRes)
         try {
             return a.getColor(0, def)
@@ -457,7 +459,25 @@ object ThemeUtils {
         }
     }
 
-    fun getDrawableFromThemeAttribute(context: Context, attr: Int): Drawable {
+    fun getColorStateListFromAttribute(context: Context, @AttrRes attr: Int, styleRes: Int = 0): ColorStateList? {
+        val a = context.obtainStyledAttributes(null, intArrayOf(attr), 0, styleRes)
+        try {
+            return a.getColorStateList(0)
+        } finally {
+            a.recycle()
+        }
+    }
+
+    fun getBooleanFromAttribute(context: Context, @AttrRes attr: Int, styleRes: Int = 0, def: Boolean = false): Boolean {
+        val a = context.obtainStyledAttributes(null, intArrayOf(attr), 0, styleRes)
+        try {
+            return a.getBoolean(0, def)
+        } finally {
+            a.recycle()
+        }
+    }
+
+    fun getDrawableFromThemeAttribute(context: Context, @AttrRes attr: Int): Drawable {
         val a = TintTypedArray.obtainStyledAttributes(context, null, intArrayOf(attr))
         try {
             return a.getDrawable(0)

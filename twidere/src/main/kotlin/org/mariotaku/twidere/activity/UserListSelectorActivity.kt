@@ -85,11 +85,11 @@ class UserListSelectorActivity : BaseActivity(),
         }
         setContentView(R.layout.activity_user_list_selector)
 
-        adapter = SimpleParcelableUserListsAdapter(this, Glide.with(this))
+        adapter = SimpleParcelableUserListsAdapter(this, requestManager)
         adapter.loadMoreSupportedPosition = ILoadMoreSupportAdapter.END
         listView.addFooterView(layoutInflater.inflate(R.layout.simple_list_item_activated_1,
                 listView, false).apply {
-            (findViewById(android.R.id.text1) as TextView).setText(R.string.action_select_user)
+            findViewById<TextView>(android.R.id.text1).setText(R.string.action_select_user)
         }, SelectUserAction, true)
         listView.adapter = adapter
         val handler = ListViewScrollHandler(this, listView)

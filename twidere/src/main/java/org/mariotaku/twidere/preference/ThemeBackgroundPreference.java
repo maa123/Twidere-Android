@@ -23,7 +23,7 @@ import android.widget.SeekBar;
 
 import org.mariotaku.twidere.Constants;
 import org.mariotaku.twidere.R;
-import org.mariotaku.twidere.extension.AlertDialogExtensionsKt;
+import org.mariotaku.twidere.extension.DialogExtensionsKt;
 import org.mariotaku.twidere.preference.iface.IDialogPreference;
 
 /**
@@ -98,7 +98,7 @@ public class ThemeBackgroundPreference extends DialogPreference implements Const
     }
 
     @Override
-    public void displayDialog(PreferenceFragmentCompat fragment) {
+    public void displayDialog(@NonNull PreferenceFragmentCompat fragment) {
         InternalDialogFragment df = InternalDialogFragment.newInstance(getKey());
         df.setTargetFragment(fragment, 0);
         df.show(fragment.getFragmentManager(), getKey());
@@ -174,7 +174,7 @@ public class ThemeBackgroundPreference extends DialogPreference implements Const
                 @Override
                 public void onShow(DialogInterface dialog) {
                     final AlertDialog alertDialog = (AlertDialog) dialog;
-                    AlertDialogExtensionsKt.applyTheme(alertDialog);
+                    DialogExtensionsKt.applyTheme(alertDialog);
                     if (preferences != null) {
                         final LayoutInflater inflater = alertDialog.getLayoutInflater();
                         final ListView listView = alertDialog.getListView();
@@ -184,7 +184,7 @@ public class ThemeBackgroundPreference extends DialogPreference implements Const
                         final View view = inflater.inflate(R.layout.dialog_theme_background_preference, listViewParent);
                         ((ViewGroup) view.findViewById(R.id.list_container)).addView(listView);
                         mAlphaContainer = view.findViewById(R.id.alpha_container);
-                        mAlphaSlider = (SeekBar) view.findViewById(R.id.alpha_slider);
+                        mAlphaSlider = view.findViewById(R.id.alpha_slider);
                         mAlphaSlider.setMax(MAX_ALPHA - MIN_ALPHA);
                         mAlphaSlider.setProgress(preferences.getInt(KEY_THEME_BACKGROUND_ALPHA, DEFAULT_THEME_BACKGROUND_ALPHA) - MIN_ALPHA);
                         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {

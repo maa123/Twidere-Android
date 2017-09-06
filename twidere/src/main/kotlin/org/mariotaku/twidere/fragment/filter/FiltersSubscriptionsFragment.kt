@@ -79,18 +79,20 @@ class FiltersSubscriptionsFragment : BaseFragment(), LoaderManager.LoaderCallbac
             when (arguments?.getString(EXTRA_ACTION)) {
                 ACTION_ADD_URL_SUBSCRIPTION -> {
                     if (!extraFeaturesService.isEnabled(ExtraFeaturesService.FEATURE_FILTERS_SUBSCRIPTION)) {
-                        val df = ExtraFeaturesIntroductionDialogFragment.show(childFragmentManager,
+                        val df = ExtraFeaturesIntroductionDialogFragment.create(
                                 ExtraFeaturesService.FEATURE_FILTERS_SUBSCRIPTION)
                         df.setTargetFragment(this, REQUEST_ADD_URL_SUBSCRIPTION_PURCHASE)
+                        df.show(fragmentManager, ExtraFeaturesIntroductionDialogFragment.FRAGMENT_TAG)
                     } else {
                         showAddUrlSubscription()
                     }
                 }
                 else -> {
                     if (!extraFeaturesService.isEnabled(ExtraFeaturesService.FEATURE_FILTERS_SUBSCRIPTION)) {
-                        val df = ExtraFeaturesIntroductionDialogFragment.show(childFragmentManager,
+                        val df = ExtraFeaturesIntroductionDialogFragment.create(
                                 ExtraFeaturesService.FEATURE_FILTERS_SUBSCRIPTION)
                         df.setTargetFragment(this, REQUEST_PURCHASE_EXTRA_FEATURES)
+                        df.show(fragmentManager, ExtraFeaturesIntroductionDialogFragment.FRAGMENT_TAG)
                     }
                 }
             }
@@ -269,8 +271,8 @@ class FiltersSubscriptionsFragment : BaseFragment(), LoaderManager.LoaderCallbac
         override fun bindView(view: View, context: Context, cursor: Cursor) {
             super.bindView(view, context, cursor)
             val indices = this.indices!!
-            val iconView = view.findViewById(android.R.id.icon)
-            val summaryView = view.findViewById(android.R.id.text2) as TextView
+            val iconView = view.findViewById<View>(android.R.id.icon)
+            val summaryView = view.findViewById<TextView>(android.R.id.text2)
 
             indices.parseFields(tempObject, cursor)
 
@@ -285,8 +287,8 @@ class FiltersSubscriptionsFragment : BaseFragment(), LoaderManager.LoaderCallbac
             builder.setView(R.layout.dialog_add_filters_subscription)
             builder.setPositiveButton(R.string.action_add_filters_subscription) { dialog, _ ->
                 dialog as AlertDialog
-                val editName = dialog.findViewById(R.id.name) as MaterialEditText
-                val editUrl = dialog.findViewById(R.id.url) as MaterialEditText
+                val editName = dialog.findViewById<MaterialEditText>(R.id.name)!!
+                val editUrl = dialog.findViewById<MaterialEditText>(R.id.url)!!
                 val subscription = FiltersSubscription()
                 subscription.name = editName.text.toString()
                 subscription.setupUrl(editUrl.text.toString())
@@ -297,11 +299,10 @@ class FiltersSubscriptionsFragment : BaseFragment(), LoaderManager.LoaderCallbac
             }
             builder.setNegativeButton(android.R.string.cancel, null)
             val dialog = builder.create()
-            dialog.setOnShowListener {
-                it as AlertDialog
+            dialog.onShow {
                 it.applyTheme()
-                val editName = it.findViewById(R.id.name) as MaterialEditText
-                val editUrl = it.findViewById(R.id.url) as MaterialEditText
+                val editName = it.findViewById<MaterialEditText>(R.id.name)!!
+                val editUrl = it.findViewById<MaterialEditText>(R.id.url)!!
                 val positiveButton = it.getButton(DialogInterface.BUTTON_POSITIVE)
 
                 fun updateEnableState() {

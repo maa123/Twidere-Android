@@ -21,6 +21,7 @@ package org.mariotaku.twidere.util;
 
 import android.app.Application;
 import android.os.Build;
+import android.support.annotation.NonNull;
 import android.webkit.WebView;
 
 import com.facebook.stetho.DumperPluginsProvider;
@@ -56,7 +57,7 @@ public class DebugModeUtils {
 
         builder.addNetworkInterceptor(new Interceptor() {
             @Override
-            public Response intercept(Chain chain) throws IOException {
+            public Response intercept(@NonNull Chain chain) throws IOException {
                 if (chain.request().tag() == NoIntercept.INSTANCE) {
                     return chain.proceed(chain.request());
                 }
@@ -87,6 +88,11 @@ public class DebugModeUtils {
     static void initLeakCanary(Application application) {
         if (!BuildConfig.LEAK_CANARY_ENABLED) return;
         LeakCanary.enableDisplayLeakActivity(application);
+        if (LeakCanary.isInAnalyzerProcess(application)) {
+            // This process is dedicated to LeakCanary for heap analysis.
+            // You should not init your app in this process.
+            return;
+        }
         sRefWatcher = LeakCanary.install(application);
     }
 

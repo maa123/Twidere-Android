@@ -31,6 +31,7 @@ import org.mariotaku.twidere.R
 import org.mariotaku.twidere.TwidereConstants.*
 import org.mariotaku.twidere.constant.userTimelineFilterKey
 import org.mariotaku.twidere.extension.applyTheme
+import org.mariotaku.twidere.extension.onShow
 import org.mariotaku.twidere.fragment.BaseDialogFragment
 import org.mariotaku.twidere.fragment.ParcelableStatusesFragment
 import org.mariotaku.twidere.loader.statuses.UserTimelineLoader
@@ -126,7 +127,7 @@ class UserTimelineFragment : ParcelableStatusesFragment() {
     override fun onFilterClick(holder: TimelineFilterHeaderViewHolder) {
         val df = UserTimelineFilterDialogFragment()
         df.setTargetFragment(this, REQUEST_SET_TIMELINE_FILTER)
-        df.show(childFragmentManager, "set_timeline_filter")
+        df.show(fragmentManager, "set_timeline_filter")
     }
 
     @Subscribe
@@ -171,10 +172,7 @@ class UserTimelineFragment : ParcelableStatusesFragment() {
                 (targetFragment as UserTimelineFragment).reloadAllStatuses()
             }
             val dialog = builder.create()
-            dialog.setOnShowListener {
-                it as AlertDialog
-                it.applyTheme()
-            }
+            dialog.onShow { it.applyTheme() }
             return dialog
         }
 

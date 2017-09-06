@@ -17,6 +17,7 @@ import android.view.ViewGroup
 import android.widget.BaseExpandableListAdapter
 import android.widget.ExpandableListView
 import android.widget.TextView
+import kotlinx.android.synthetic.main.dialog_expandable_list.*
 import nl.komponents.kovenant.combine.and
 import nl.komponents.kovenant.task
 import nl.komponents.kovenant.ui.alwaysUi
@@ -30,6 +31,7 @@ import org.mariotaku.microblog.library.twitter.model.Location
 import org.mariotaku.twidere.R
 import org.mariotaku.twidere.constant.IntentConstants.*
 import org.mariotaku.twidere.extension.applyTheme
+import org.mariotaku.twidere.extension.onShow
 import org.mariotaku.twidere.fragment.BaseDialogFragment
 import org.mariotaku.twidere.fragment.ProgressDialogFragment
 import org.mariotaku.twidere.model.UserKey
@@ -67,20 +69,20 @@ class TrendsLocationSelectorActivity : BaseActivity() {
             return@task map.pack()
         }.successUi { result ->
             val activity = weakThis.get() ?: return@successUi
-            activity.executeAfterFragmentResumed { activity ->
+            activity.executeAfterFragmentResumed {
                 val df = TrendsLocationDialogFragment()
                 df.arguments = Bundle {
                     this[EXTRA_DATA] = result
                 }
-                df.show(activity.supportFragmentManager, "trends_location_selector")
+                df.show(it.supportFragmentManager, "trends_location_selector")
             }
         }.failUi {
             val activity = weakThis.get() ?: return@failUi
             activity.finish()
         }.alwaysUi {
             val activity = weakThis.get() ?: return@alwaysUi
-            activity.executeAfterFragmentResumed { activity ->
-                val fm = activity.supportFragmentManager
+            activity.executeAfterFragmentResumed {
+                val fm = it.supportFragmentManager
                 val df = fm.findFragmentByTag(PROGRESS_FRAGMENT_TAG) as? DialogFragment
                 df?.dismiss()
             }
@@ -96,10 +98,9 @@ class TrendsLocationSelectorActivity : BaseActivity() {
             selectorBuilder.setView(R.layout.dialog_expandable_list)
             selectorBuilder.setNegativeButton(android.R.string.cancel, null)
             val dialog = selectorBuilder.create()
-            dialog.setOnShowListener {
-                it as AlertDialog
+            dialog.onShow {
                 it.applyTheme()
-                val listView = it.findViewById(R.id.expandableList) as ExpandableListView
+                val listView = it.expandableList
                 val adapter = ExpandableTrendLocationsListAdapter(context)
                 adapter.data = list
                 listView.setAdapter(adapter)
@@ -110,7 +111,7 @@ class TrendsLocationSelectorActivity : BaseActivity() {
                         dismiss()
                         return@OnGroupClickListener true
                     }
-                    false
+                    return@OnGroupClickListener false
                 })
                 listView.setOnChildClickListener { _, _, groupPosition, childPosition, _ ->
                     val child = adapter.getChild(groupPosition, childPosition)
@@ -182,7 +183,7 @@ class TrendsLocationSelectorActivity : BaseActivity() {
             } else {
                 view = inflater.inflate(android.R.layout.simple_expandable_list_item_1, parent, false)
             }
-            (view.findViewById(android.R.id.text1) as TextView).text = getGroup(groupPosition).name
+            view.findViewById<TextView>(android.R.id.text1).text = getGroup(groupPosition).name
             return view
         }
 
@@ -194,7 +195,7 @@ class TrendsLocationSelectorActivity : BaseActivity() {
                 view = inflater.inflate(android.R.layout.simple_list_item_1, parent, false)
             }
             val location = getChild(groupPosition, childPosition)
-            val text1 = view.findViewById(android.R.id.text1) as TextView
+            val text1 = view.findViewById<TextView>(android.R.id.text1)
             if (location.parentId == WORLDWIDE) {
                 text1.setText(R.string.location_countrywide)
             } else {

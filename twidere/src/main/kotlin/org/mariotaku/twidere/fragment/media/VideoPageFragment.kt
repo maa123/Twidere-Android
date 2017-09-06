@@ -19,7 +19,6 @@
 
 package org.mariotaku.twidere.fragment.media
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Rect
@@ -27,11 +26,9 @@ import android.graphics.drawable.ColorDrawable
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.support.v4.app.Fragment
-import android.util.Pair
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -52,6 +49,7 @@ import org.mariotaku.twidere.TwidereConstants.EXTRA_MEDIA
 import org.mariotaku.twidere.activity.MediaViewerActivity
 import org.mariotaku.twidere.activity.iface.IControlBarActivity
 import org.mariotaku.twidere.constant.IntentConstants.EXTRA_POSITION
+import org.mariotaku.twidere.extension.model.getBestVideoUrlAndType
 import org.mariotaku.twidere.fragment.iface.IBaseFragment
 import org.mariotaku.twidere.model.ParcelableMedia
 import org.mariotaku.twidere.model.UserKey
@@ -168,13 +166,13 @@ class VideoPageFragment : CacheDownloadMediaViewerFragment(), IBaseFragment<Vide
 
     override fun onViewStateRestored(savedInstanceState: Bundle?) {
         super.onViewStateRestored(savedInstanceState)
-        requestFitSystemWindows()
+        requestApplyInsets()
     }
 
     override fun getDownloadExtra(): Any? {
         val extra = MediaExtra()
         extra.isUseThumbor = false
-        val fallbackUrlAndType = getBestVideoUrlAndType(media, FALLBACK_VIDEO_TYPES)
+        val fallbackUrlAndType = media?.getBestVideoUrlAndType(FALLBACK_VIDEO_TYPES)
         if (fallbackUrlAndType != null) {
             extra.fallbackUrl = fallbackUrlAndType.first
         }
@@ -186,8 +184,8 @@ class VideoPageFragment : CacheDownloadMediaViewerFragment(), IBaseFragment<Vide
     }
 
     override fun getDownloadUri(): Uri? {
-        val bestVideoUrlAndType = getBestVideoUrlAndType(media, SUPPORTED_VIDEO_TYPES)
-        if (bestVideoUrlAndType != null && bestVideoUrlAndType.first != null) {
+        val bestVideoUrlAndType = media?.getBestVideoUrlAndType(SUPPORTED_VIDEO_TYPES)
+        if (bestVideoUrlAndType != null) {
             return Uri.parse(bestVideoUrlAndType.first)
         }
         return arguments.getParcelable<Uri>(SubsampleImageViewerFragment.EXTRA_MEDIA_URI)
@@ -197,7 +195,7 @@ class VideoPageFragment : CacheDownloadMediaViewerFragment(), IBaseFragment<Vide
         videoView.setVideoURI(result.cacheUri)
         videoControl.visibility = View.GONE
         setMediaViewVisible(true)
-        activity.supportInvalidateOptionsMenu()
+        activity.invalidateOptionsMenu()
     }
 
     override fun releaseMediaResources() {
@@ -261,7 +259,7 @@ class VideoPageFragment : CacheDownloadMediaViewerFragment(), IBaseFragment<Vide
         super.setUserVisibleHint(isVisibleToUser)
         if (activity == null) return
         if (isVisibleToUser) {
-            activity.supportInvalidateOptionsMenu()
+            activity?.invalidateOptionsMenu()
         } else if (videoView.isPlaying) {
             videoView.pause()
             updatePlayerState()
@@ -295,7 +293,7 @@ class VideoPageFragment : CacheDownloadMediaViewerFragment(), IBaseFragment<Vide
         return inflater.inflate(R.layout.layout_media_viewer_texture_video_view, container, false)
     }
 
-    override fun fitSystemWindows(insets: Rect) {
+    override fun onApplySystemWindowInsets(insets: Rect) {
         val lp = videoControl.layoutParams
         if (lp is ViewGroup.MarginLayoutParams) {
             lp.bottomMargin = insets.bottom
@@ -384,7 +382,7 @@ class VideoPageFragment : CacheDownloadMediaViewerFragment(), IBaseFragment<Vide
         const val EXTRA_DEFAULT_MUTE = "default_mute"
         internal const val EXTRA_PAUSED_BY_USER = "paused_by_user"
         internal const val EXTRA_PLAY_AUDIO = "play_audio"
-        internal val SUPPORTED_VIDEO_TYPES: Array<String>
+        internal val SUPPORTED_VIDEO_TYPES: Array<String> = arrayOf("video/webm", "video/mp4")
         internal val FALLBACK_VIDEO_TYPES: Array<String> = arrayOf("video/mp4")
 
         internal val MediaViewerFragment.isLoopEnabled: Boolean
@@ -398,35 +396,5 @@ class VideoPageFragment : CacheDownloadMediaViewerFragment(), IBaseFragment<Vide
         internal val MediaViewerFragment.accountKey: UserKey
             get() = arguments.getParcelable<UserKey>(EXTRA_ACCOUNT_KEY)
 
-        init {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-                SUPPORTED_VIDEO_TYPES = arrayOf("video/mp4")
-            } else {
-                SUPPORTED_VIDEO_TYPES = arrayOf("video/webm", "video/mp4")
-            }
-        }
-
-
-        @SuppressLint("SwitchIntDef")
-        internal fun getBestVideoUrlAndType(media: ParcelableMedia?, supportedTypes: Array<String>): Pair<String, String>? {
-            if (media == null) return null
-            when (media.type) {
-                ParcelableMedia.Type.VIDEO, ParcelableMedia.Type.ANIMATED_GIF -> {
-                    if (media.video_info == null) {
-                        return Pair.create<String, String>(media.media_url, null)
-                    }
-                    val firstMatch = media.video_info.variants.filter { variant ->
-                        supportedTypes.any { it.equals(variant.content_type, ignoreCase = true) }
-                    }.sortedByDescending(ParcelableMedia.VideoInfo.Variant::bitrate).firstOrNull() ?: return null
-                    return Pair.create(firstMatch.url, firstMatch.content_type)
-                }
-                ParcelableMedia.Type.CARD_ANIMATED_GIF -> {
-                    return Pair.create<String, String>(media.media_url, "video/mp4")
-                }
-                else -> {
-                    return null
-                }
-            }
-        }
     }
 }

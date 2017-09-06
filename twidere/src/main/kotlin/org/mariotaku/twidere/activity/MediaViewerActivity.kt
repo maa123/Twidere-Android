@@ -20,7 +20,6 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -31,14 +30,13 @@ import android.support.v4.app.DialogFragment
 import android.support.v4.app.Fragment
 import android.support.v4.content.ContextCompat
 import android.support.v4.graphics.ColorUtils
+import android.support.v4.view.ViewCompat
 import android.support.v4.view.ViewPager
+import android.support.v4.view.WindowInsetsCompat
 import android.support.v4.widget.ViewDragHelper
 import android.support.v7.app.WindowDecorActionBar
 import android.support.v7.app.decorToolbar
-import android.view.Menu
-import android.view.MenuItem
-import android.view.View
-import android.view.WindowManager
+import android.view.*
 import android.widget.Toast
 import kotlinx.android.synthetic.main.activity_media_viewer.*
 import org.mariotaku.chameleon.Chameleon
@@ -50,7 +48,6 @@ import org.mariotaku.mediaviewer.library.*
 import org.mariotaku.mediaviewer.library.subsampleimageview.SubsampleImageViewerFragment.EXTRA_MEDIA_URI
 import org.mariotaku.twidere.R
 import org.mariotaku.twidere.TwidereConstants.*
-import org.mariotaku.twidere.activity.iface.IBaseActivity
 import org.mariotaku.twidere.activity.iface.IControlBarActivity.ControlBarShowHideHelper
 import org.mariotaku.twidere.annotation.CacheFileType
 import org.mariotaku.twidere.extension.addSystemUiVisibility
@@ -99,13 +96,14 @@ class MediaViewerActivity : BaseActivity(), IMediaViewerActivity, MediaSwipeClos
         return@lazy intent.getNullableTypedArrayExtra<ParcelableMedia>(EXTRA_MEDIA) ?: emptyArray()
     }
 
-    private val currentFragment: MediaViewerFragment? get() {
-        val viewPager = findViewPager()
-        val adapter = viewPager.adapter
-        val currentItem = viewPager.currentItem
-        if (currentItem < 0 || currentItem >= adapter.count) return null
-        return adapter.instantiateItem(viewPager, currentItem) as? MediaViewerFragment
-    }
+    private val currentFragment: MediaViewerFragment?
+        get() {
+            val viewPager = findViewPager()
+            val adapter = viewPager.adapter
+            val currentItem = viewPager.currentItem
+            if (currentItem < 0 || currentItem >= adapter.count) return null
+            return adapter.instantiateItem(viewPager, currentItem) as? MediaViewerFragment
+        }
 
     override val shouldApplyWindowBackground: Boolean = false
 
@@ -122,6 +120,7 @@ class MediaViewerActivity : BaseActivity(), IMediaViewerActivity, MediaSwipeClos
             }
             return 0f
         }
+        @SuppressLint("RestrictedApi")
         set(offset) {
             val actionBar = supportActionBar
             if (actionBar != null && !hideOffsetNotSupported) {
@@ -154,10 +153,10 @@ class MediaViewerActivity : BaseActivity(), IMediaViewerActivity, MediaSwipeClos
         swipeContainer.backgroundAlpha = 1f
         WindowSupport.setStatusBarColor(window, Color.TRANSPARENT)
         activityLayout.setStatusBarColor(overrideTheme.colorToolbar)
-        activityLayout.setWindowInsetsListener { l, t, r, b ->
-            val statusBarHeight = t - ThemeUtils.getActionBarHeight(this)
+        ViewCompat.setOnApplyWindowInsetsListener(activityLayout) { view, insets ->
+            val statusBarHeight = insets.systemWindowInsetTop - ThemeUtils.getActionBarHeight(this)
             activityLayout.setStatusBarHeight(statusBarHeight)
-            onFitSystemWindows(Rect(l, t, r, b))
+            onApplyWindowInsets(view, insets)
         }
     }
 
@@ -265,6 +264,11 @@ class MediaViewerActivity : BaseActivity(), IMediaViewerActivity, MediaSwipeClos
             }
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        currentFragment
+        return super.onKeyUp(keyCode, event)
     }
 
     override fun toggleBar() {
@@ -402,14 +406,15 @@ class MediaViewerActivity : BaseActivity(), IMediaViewerActivity, MediaSwipeClos
         controlBarShowHideHelper.setControlBarVisibleAnimate(visible, listener)
     }
 
-    override fun onFitSystemWindows(insets: Rect) {
-        super.onFitSystemWindows(insets)
+    override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
+        val result = super.onApplyWindowInsets(v, insets)
         val adapter = viewPager.adapter
-        if (adapter.count == 0) return
+        if (adapter.count == 0) return insets
         val fragment = adapter.instantiateItem(viewPager, viewPager.currentItem)
         if (fragment is IBaseFragment<*>) {
-            fragment.requestFitSystemWindows()
+            fragment.requestApplyInsets()
         }
+        return result
     }
 
     private fun processShareIntent(intent: Intent) {
@@ -457,50 +462,7 @@ class MediaViewerActivity : BaseActivity(), IMediaViewerActivity, MediaSwipeClos
         val f = adapter.instantiateItem(viewPager, shareMediaPosition) as? MediaViewerFragment ?: return
         val fileInfo = f.cacheFileInfo() ?: return
         val destination = ShareProvider.getFilesDir(this) ?: return
-        val task = object : SaveFileTask(this@MediaViewerActivity, destination, fileInfo) {
-            private val PROGRESS_FRAGMENT_TAG = "progress"
-
-            override fun dismissProgress() {
-                val activity = context as IBaseActivity<*>
-                activity.executeAfterFragmentResumed { activity ->
-                    val fm = activity.supportFragmentManager
-                    val fragment = fm.findFragmentByTag(PROGRESS_FRAGMENT_TAG) as? DialogFragment
-                    fragment?.dismiss()
-                }
-            }
-
-            override fun showProgress() {
-                val activity = context as IBaseActivity<*>
-                activity.executeAfterFragmentResumed { activity ->
-                    val fragment = ProgressDialogFragment()
-                    fragment.isCancelable = false
-                    fragment.show(activity.supportFragmentManager, PROGRESS_FRAGMENT_TAG)
-                }
-            }
-
-            override fun onFileSaved(savedFile: File, mimeType: String?) {
-                val activity = context as MediaViewerActivity
-
-                val fileUri = ShareProvider.getUriForFile(activity, AUTHORITY_TWIDERE_SHARE,
-                        savedFile)
-
-                val intent = Intent(Intent.ACTION_SEND)
-                intent.setDataAndType(fileUri, mimeType)
-                intent.putExtra(Intent.EXTRA_STREAM, fileUri)
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    intent.addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
-                }
-                activity.processShareIntent(intent)
-                startActivityForResult(Intent.createChooser(intent, activity.getString(R.string.action_share)),
-                        REQUEST_SHARE_MEDIA)
-            }
-
-            override fun onFileSaveFailed() {
-                val activity = context as MediaViewerActivity
-                Toast.makeText(activity, R.string.message_toast_error_occurred, Toast.LENGTH_SHORT).show()
-            }
-        }
+        val task = SaveMediaTask(this, destination, fileInfo)
         task.execute()
     }
 
@@ -546,6 +508,53 @@ class MediaViewerActivity : BaseActivity(), IMediaViewerActivity, MediaSwipeClos
         }
     }
 
+    class SaveMediaTask(activity: MediaViewerActivity, destination: File, fileInfo: FileInfo) :
+            SaveFileTask(activity, destination, fileInfo) {
+        private val PROGRESS_FRAGMENT_TAG = "progress"
+
+        override fun dismissProgress() {
+            val activity = context as? MediaViewerActivity ?: return
+
+            activity.executeAfterFragmentResumed {
+                val fm = it.supportFragmentManager
+                val fragment = fm.findFragmentByTag(PROGRESS_FRAGMENT_TAG) as? DialogFragment
+                fragment?.dismiss()
+            }
+        }
+
+        override fun showProgress() {
+            val activity = context as? MediaViewerActivity ?: return
+
+            activity.executeAfterFragmentResumed {
+                val fragment = ProgressDialogFragment()
+                fragment.isCancelable = false
+                fragment.show(it.supportFragmentManager, PROGRESS_FRAGMENT_TAG)
+            }
+        }
+
+        override fun onFileSaved(savedFile: File, mimeType: String?) {
+            val activity = context as? MediaViewerActivity ?: return
+
+            val fileUri = ShareProvider.getUriForFile(activity, AUTHORITY_TWIDERE_SHARE,
+                    savedFile)
+
+            val intent = Intent(Intent.ACTION_SEND)
+            intent.setDataAndType(fileUri, mimeType)
+            intent.putExtra(Intent.EXTRA_STREAM, fileUri)
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                intent.addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+            }
+            activity.processShareIntent(intent)
+            activity.startActivityForResult(Intent.createChooser(intent, activity.getString(R.string.action_share)),
+                    REQUEST_SHARE_MEDIA)
+        }
+
+        override fun onFileSaveFailed() {
+            val activity = context as? MediaViewerActivity ?: return
+            Toast.makeText(activity, R.string.message_toast_error_occurred, Toast.LENGTH_SHORT).show()
+        }
+    }
     companion object {
 
         private val REQUEST_SHARE_MEDIA = 201
@@ -556,5 +565,7 @@ class MediaViewerActivity : BaseActivity(), IMediaViewerActivity, MediaSwipeClos
         const val FLAG_SYSTEM_UI_HIDE_BARS = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
                 View.SYSTEM_UI_FLAG_FULLSCREEN
     }
+
+    interface Media
 }
 

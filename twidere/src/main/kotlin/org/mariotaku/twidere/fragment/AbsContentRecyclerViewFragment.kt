@@ -26,6 +26,7 @@ import android.support.v4.widget.SwipeRefreshLayout
 import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.RecyclerView.ItemDecoration
 import android.view.*
+import com.bumptech.glide.RequestManager
 import kotlinx.android.synthetic.main.fragment_content_recyclerview.*
 import kotlinx.android.synthetic.main.layout_content_fragment_common.*
 import org.mariotaku.twidere.R
@@ -63,6 +64,25 @@ abstract class AbsContentRecyclerViewFragment<A : LoadMoreSupportAdapter<Recycle
 
     private val refreshCompleteListener: RefreshCompleteListener?
         get() = parentFragment as? RefreshCompleteListener
+
+    val isProgressShowing: Boolean
+        get() = progressContainer.visibility == View.VISIBLE
+
+    override var refreshing: Boolean
+        get () = swipeLayout.isRefreshing
+        set(value) {
+            if (isProgressShowing) return
+            val currentRefreshing = swipeLayout.isRefreshing
+            if (!currentRefreshing) {
+                updateRefreshProgressOffset()
+            }
+            if (!value) {
+                refreshCompleteListener?.onRefreshComplete(this)
+            }
+            if (value == currentRefreshing) return
+            val layoutRefreshing = value && adapter.loadMoreIndicatorPosition != ILoadMoreSupportAdapter.NONE
+            swipeLayout.isRefreshing = layoutRefreshing
+        }
 
     override fun canScroll(dy: Float): Boolean {
         return drawerCallback.canScroll(dy)
@@ -136,21 +156,6 @@ abstract class AbsContentRecyclerViewFragment<A : LoadMoreSupportAdapter<Recycle
         drawerCallback.topChanged(offset)
     }
 
-    override var refreshing: Boolean
-        get () = swipeLayout.isRefreshing
-        set(value) {
-            val currentRefreshing = swipeLayout.isRefreshing
-            if (!currentRefreshing) {
-                updateRefreshProgressOffset()
-            }
-            if (!value) {
-                refreshCompleteListener?.onRefreshComplete(this)
-            }
-            if (value == currentRefreshing) return
-            val layoutRefreshing = value && adapter.loadMoreIndicatorPosition != ILoadMoreSupportAdapter.NONE
-            swipeLayout.isRefreshing = layoutRefreshing
-        }
-
     var refreshEnabled: Boolean
         get() = swipeLayout.isEnabled
         set(value) {
@@ -162,7 +167,7 @@ abstract class AbsContentRecyclerViewFragment<A : LoadMoreSupportAdapter<Recycle
         refreshEnabled = position == ILoadMoreSupportAdapter.NONE
     }
 
-    override fun onAttach(context: Context?) {
+    override fun onAttach(context: Context) {
         super.onAttach(context)
         if (context is IControlBarActivity) {
             context.registerControlBarOffsetListener(this)
@@ -182,7 +187,7 @@ abstract class AbsContentRecyclerViewFragment<A : LoadMoreSupportAdapter<Recycle
                 R.color.bg_refresh_progress_color_light, R.color.bg_refresh_progress_color_dark)
         swipeLayout.setOnRefreshListener(this)
         swipeLayout.setProgressBackgroundColorSchemeResource(colorRes)
-        adapter = onCreateAdapter(context)
+        adapter = onCreateAdapter(context, requestManager)
         layoutManager = onCreateLayoutManager(context)
         scrollListener = RecyclerViewScrollHandler(this, RecyclerViewScrollHandler.RecyclerViewCallback(recyclerView))
 
@@ -190,7 +195,7 @@ abstract class AbsContentRecyclerViewFragment<A : LoadMoreSupportAdapter<Recycle
         recyclerView.setHasFixedSize(true)
         val swipeLayout = swipeLayout
         if (swipeLayout is ExtendedSwipeRefreshLayout) {
-            swipeLayout.setTouchInterceptor(object : IExtendedView.TouchInterceptor {
+            swipeLayout.touchInterceptor = object : IExtendedView.TouchInterceptor {
                 override fun dispatchTouchEvent(view: View, event: MotionEvent): Boolean {
                     scrollListener.touchListener.onTouch(view, event)
                     return false
@@ -207,7 +212,7 @@ abstract class AbsContentRecyclerViewFragment<A : LoadMoreSupportAdapter<Recycle
                     return false
                 }
 
-            })
+            }
         } else {
             recyclerView.setOnTouchListener(scrollListener.touchListener)
         }
@@ -249,7 +254,7 @@ abstract class AbsContentRecyclerViewFragment<A : LoadMoreSupportAdapter<Recycle
     protected open val extraContentPadding: Rect
         get() = Rect()
 
-    override fun fitSystemWindows(insets: Rect) {
+    override fun onApplySystemWindowInsets(insets: Rect) {
         val extraPadding = extraContentPadding
         recyclerView.setPadding(insets.left + extraPadding.left, insets.top + extraPadding.top,
                 insets.right + extraPadding.right, insets.bottom + extraPadding.bottom)
@@ -267,8 +272,7 @@ abstract class AbsContentRecyclerViewFragment<A : LoadMoreSupportAdapter<Recycle
         return false
     }
 
-    protected abstract fun onCreateAdapter(context: Context): A
-
+    protected abstract fun onCreateAdapter(context: Context, requestManager: RequestManager): A
 
     protected open fun onCreateItemDecoration(context: Context, recyclerView: RecyclerView,
             layoutManager: L): ItemDecoration? {
@@ -304,19 +308,15 @@ abstract class AbsContentRecyclerViewFragment<A : LoadMoreSupportAdapter<Recycle
     }
 
     protected fun updateRefreshProgressOffset() {
-        val activity = activity
         val insets = this.systemWindowsInsets
-        if (activity !is IControlBarActivity || insets.top == 0 || swipeLayout == null || refreshing) {
+        if (insets.top == 0 || swipeLayout == null || swipeLayout.isRefreshing) {
             return
         }
         val progressCircleDiameter = swipeLayout.progressCircleDiameter
         if (progressCircleDiameter == 0) return
-        val density = resources.displayMetrics.density
-        val controlBarOffsetPixels = Math.round(activity.controlBarHeight * (1 - activity.controlBarOffset))
-        val swipeStart = insets.top - controlBarOffsetPixels - progressCircleDiameter
-        // 64: SwipeRefreshLayout.DEFAULT_CIRCLE_TARGET
-        val swipeDistance = Math.round(64 * density)
-        swipeLayout.setProgressViewOffset(false, swipeStart, swipeStart + swipeDistance)
+        val progressViewStart = 0 - progressCircleDiameter
+        val progressViewEnd = insets.top + resources.getDimensionPixelSize(R.dimen.element_spacing_normal)
+        swipeLayout.setProgressViewOffset(false, progressViewStart, progressViewEnd)
     }
 
     interface RefreshCompleteListener {

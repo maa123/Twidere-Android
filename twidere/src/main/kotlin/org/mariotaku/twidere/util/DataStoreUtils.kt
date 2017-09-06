@@ -48,6 +48,9 @@ import org.mariotaku.twidere.constant.databaseItemLimitKey
 import org.mariotaku.twidere.extension.model.*
 import org.mariotaku.twidere.extension.model.api.mastodon.toParcelable
 import org.mariotaku.twidere.extension.model.api.toParcelable
+import org.mariotaku.twidere.extension.queryCount
+import org.mariotaku.twidere.extension.queryOne
+import org.mariotaku.twidere.extension.queryReference
 import org.mariotaku.twidere.extension.rawQuery
 import org.mariotaku.twidere.model.*
 import org.mariotaku.twidere.model.tab.extra.HomeTabExtras
@@ -201,10 +204,9 @@ object DataStoreUtils {
 
     fun getRefreshNewestActivityMaxPositions(context: Context, uri: Uri, accountKeys: Array<UserKey?>):
             Array<String?> {
-        return getOfficialSeparatedIds(context, { accountKeys, isOfficial ->
+        return getOfficialSeparatedIds(context, { keys, isOfficial ->
             val (where, whereArgs) = getIdsWhere(isOfficial)
-            DataStoreUtils.getNewestActivityMaxPositions(context, uri, accountKeys,
-                    where, whereArgs)
+            DataStoreUtils.getNewestActivityMaxPositions(context, uri, keys, where, whereArgs)
         }, { arr1, arr2 ->
             Array(accountKeys.size) { arr1[it] ?: arr2[it] }
         }, accountKeys)
@@ -219,10 +221,9 @@ object DataStoreUtils {
 
     fun getRefreshOldestActivityMaxPositions(context: Context, uri: Uri, accountKeys: Array<UserKey?>):
             Array<String?> {
-        return getOfficialSeparatedIds(context, { accountKeys, isOfficial ->
+        return getOfficialSeparatedIds(context, { keys, isOfficial ->
             val (where, whereArgs) = getIdsWhere(isOfficial)
-            DataStoreUtils.getOldestActivityMaxPositions(context, uri, accountKeys,
-                    where, whereArgs)
+            DataStoreUtils.getOldestActivityMaxPositions(context, uri, keys, where, whereArgs)
         }, { arr1, arr2 ->
             Array(accountKeys.size) { arr1[it] ?: arr2[it] }
         }, accountKeys)
@@ -237,10 +238,9 @@ object DataStoreUtils {
 
     fun getRefreshNewestActivityMaxSortPositions(context: Context, uri: Uri, accountKeys: Array<UserKey?>):
             LongArray {
-        return getOfficialSeparatedIds(context, { accountKeys, isOfficial ->
+        return getOfficialSeparatedIds(context, { keys, isOfficial ->
             val (where, whereArgs) = getIdsWhere(isOfficial)
-            DataStoreUtils.getNewestActivityMaxSortPositions(context, uri, accountKeys,
-                    where, whereArgs)
+            DataStoreUtils.getNewestActivityMaxSortPositions(context, uri, keys, where, whereArgs)
         }, { arr1, arr2 ->
             LongArray(accountKeys.size) { arr1[it].takeIf { it > 0 } ?: arr2[it] }
         }, accountKeys)
@@ -255,10 +255,9 @@ object DataStoreUtils {
 
     fun getRefreshOldestActivityMaxSortPositions(context: Context, uri: Uri, accountKeys: Array<UserKey?>):
             LongArray {
-        return getOfficialSeparatedIds(context, { accountKeys, isOfficial ->
+        return getOfficialSeparatedIds(context, { keys, isOfficial ->
             val (where, whereArgs) = getIdsWhere(isOfficial)
-            DataStoreUtils.getOldestActivityMaxSortPositions(context, uri, accountKeys,
-                    where, whereArgs)
+            DataStoreUtils.getOldestActivityMaxSortPositions(context, uri, keys, where, whereArgs)
         }, { arr1, arr2 ->
             LongArray(accountKeys.size) { arr1[it].takeIf { it > 0 } ?: arr2[it] }
         }, accountKeys)
@@ -267,27 +266,27 @@ object DataStoreUtils {
     fun getStatusCount(context: Context, uri: Uri, accountKey: UserKey): Int {
         val where = Expression.equalsArgs(AccountSupportColumns.ACCOUNT_KEY).sql
         val whereArgs = arrayOf(accountKey.toString())
-        return queryCount(context.contentResolver, uri, where, whereArgs)
+        return context.contentResolver.queryCount(uri, where, whereArgs)
     }
 
     fun getActivitiesCount(context: Context, uri: Uri,
             accountKey: UserKey): Int {
         val where = Expression.equalsArgs(AccountSupportColumns.ACCOUNT_KEY).sql
-        return queryCount(context.contentResolver, uri, where, arrayOf(accountKey.toString()))
+        return context.contentResolver.queryCount(uri, where, arrayOf(accountKey.toString()))
     }
 
-
-    @SuppressLint("Recycle")
     fun getFilteredUserKeys(context: Context?): Array<UserKey> {
         if (context == null) return emptyArray()
         val resolver = context.contentResolver
         val projection = arrayOf(Filters.Users.USER_KEY)
-        return resolver.query(Filters.Users.CONTENT_URI, projection, null, null, null)?.useCursor { cur ->
-            return@useCursor Array(cur.count) { i ->
+        return resolver.queryReference(Filters.Users.CONTENT_URI, projection, null,
+                null, null).use { (cur) ->
+            if (cur == null) return@use emptyArray()
+            return@use Array(cur.count) { i ->
                 cur.moveToPosition(i)
                 UserKey.valueOf(cur.getString(0))
             }
-        } ?: emptyArray()
+        }
     }
 
     fun getAccountDisplayName(context: Context, accountKey: UserKey, nameFirst: Boolean): String? {
@@ -353,7 +352,7 @@ object DataStoreUtils {
         }
 
         val selection = Expression.and(*expressions.toTypedArray())
-        return queryCount(context.contentResolver, uri, selection.sql, expressionArgs.toTypedArray())
+        return context.contentResolver.queryCount(uri, selection.sql, expressionArgs.toTypedArray())
     }
 
     fun getActivitiesCount(context: Context, uri: Uri, compareColumn: String,
@@ -370,7 +369,7 @@ object DataStoreUtils {
         )
         val whereArgs = arrayListOf<String>()
         keys.mapTo(whereArgs) { it.toString() }
-        return queryCount(context.contentResolver, uri, selection.sql, whereArgs.toTypedArray())
+        return context.contentResolver.queryCount(uri, selection.sql, whereArgs.toTypedArray())
     }
 
     fun getActivitiesCount(context: Context, uri: Uri,
@@ -394,8 +393,8 @@ object DataStoreUtils {
         val resolver = context.contentResolver
         if (followingOnly) {
             val projection = arrayOf(Activities.SOURCES)
-            val cur = resolver.query(uri, projection, selection.sql, selectionArgs, null) ?: return -1
-            cur.useCursor { cur ->
+            return resolver.queryReference(uri, projection, selection.sql, selectionArgs, null).use { (cur) ->
+                if (cur == null) return@use 0
                 var total = 0
                 cur.moveToFirst()
                 while (!cur.isAfterLast) {
@@ -418,10 +417,10 @@ object DataStoreUtils {
                     }
                     cur.moveToNext()
                 }
-                return total
+                return@use total
             }
         }
-        return queryCount(resolver, uri, selection.sql, selectionArgs)
+        return resolver.queryCount(uri, selection.sql, selectionArgs)
     }
 
     fun getTableId(uri: Uri?): Int {
@@ -558,7 +557,8 @@ object DataStoreUtils {
         return AccountUtils.getAccounts(AccountManager.get(context)).isNotEmpty()
     }
 
-    @Synchronized fun cleanDatabasesByItemLimit(context: Context) {
+    @Synchronized
+    fun cleanDatabasesByItemLimit(context: Context) {
         val resolver = context.contentResolver
         val preferences = context.getSharedPreferences(SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE)
         val itemLimit = preferences[databaseItemLimitKey]
@@ -619,16 +619,7 @@ object DataStoreUtils {
     fun isFilteringUser(context: Context, userKey: String): Boolean {
         val cr = context.contentResolver
         val where = Expression.equalsArgs(Filters.Users.USER_KEY)
-        val c = cr.query(Filters.Users.CONTENT_URI, arrayOf(SQLFunctions.COUNT()),
-                where.sql, arrayOf(userKey), null) ?: return false
-        try {
-            if (c.moveToFirst()) {
-                return c.getLong(0) > 0
-            }
-        } finally {
-            c.close()
-        }
-        return false
+        return cr.queryCount(Filters.Users.CONTENT_URI, where.sql, arrayOf(userKey)) > 0
     }
 
     private fun <T> getObjectFieldArray(context: Context, uri: Uri, keys: Array<UserKey?>,
@@ -796,9 +787,10 @@ object DataStoreUtils {
 
     fun prepareDatabase(context: Context) {
         val cr = context.contentResolver
-        val cursor = cr.query(TwidereDataStore.CONTENT_URI_DATABASE_PREPARE, null, null,
-                null, null) ?: return
-        cursor.close()
+        cr.queryReference(TwidereDataStore.CONTENT_URI_DATABASE_PREPARE, null, null,
+                null, null).use {
+            // Just try to initialize database
+        }
     }
 
     internal interface FieldArrayCreator<T, I> {
@@ -807,19 +799,6 @@ object DataStoreUtils {
         fun newIndex(cur: Cursor): I
 
         fun assign(array: T, arrayIdx: Int, cur: Cursor, colIdx: I)
-    }
-
-    fun queryCount(cr: ContentResolver, uri: Uri, selection: String?, selectionArgs: Array<String>?): Int {
-        val projection = arrayOf(SQLFunctions.COUNT())
-        val cur = cr.query(uri, projection, selection, selectionArgs, null) ?: return -1
-        try {
-            if (cur.moveToFirst()) {
-                return cur.getInt(0)
-            }
-            return -1
-        } finally {
-            cur.close()
-        }
     }
 
     fun getInteractionsCount(context: Context, extraArgs: Bundle?, accountKeys: Array<UserKey>,
@@ -903,22 +882,15 @@ object DataStoreUtils {
             accountKey: UserKey,
             statusId: String): ParcelableStatus? {
         val resolver = context.contentResolver
-        var status: ParcelableStatus? = null
         val where = Expression.and(Expression.equalsArgs(Statuses.ACCOUNT_KEY),
                 Expression.equalsArgs(Statuses.ID)).sql
         val whereArgs = arrayOf(accountKey.toString(), statusId)
         for (uri in DataStoreUtils.STATUSES_URIS) {
-            val cur = resolver.query(uri, Statuses.COLUMNS, where, whereArgs, null) ?: continue
-            try {
-                if (cur.moveToFirst()) {
-                    val indices = ObjectCursor.indicesFrom(cur, ParcelableStatus::class.java)
-                    status = indices.newObject(cur)
-                }
-            } finally {
-                cur.close()
-            }
+            val status = resolver.queryOne(uri, Statuses.COLUMNS, where, whereArgs, null,
+                    ParcelableStatus::class.java)
+            if (status != null) return status
         }
-        return status
+        return null
     }
 
 
@@ -955,16 +927,8 @@ object DataStoreUtils {
         val where = Expression.and(Expression.equalsArgs(Conversations.ACCOUNT_KEY),
                 Expression.equalsArgs(Conversations.CONVERSATION_ID)).sql
         val whereArgs = arrayOf(accountKey.toString(), conversationId)
-        val cur = resolver.query(Conversations.CONTENT_URI, Conversations.COLUMNS, where, whereArgs, null) ?: return null
-        try {
-            if (cur.moveToFirst()) {
-                val indices = ObjectCursor.indicesFrom(cur, ParcelableMessageConversation::class.java)
-                return indices.newObject(cur)
-            }
-        } finally {
-            cur.close()
-        }
-        return null
+        return resolver.queryOne(Conversations.CONTENT_URI, Conversations.COLUMNS, where, whereArgs,
+                null, ParcelableMessageConversation::class.java)
     }
 
 

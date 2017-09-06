@@ -25,9 +25,13 @@ import android.content.*
 import android.content.res.Resources
 import android.graphics.Rect
 import android.nfc.NfcAdapter
+import android.os.Build
 import android.os.Bundle
 import android.support.annotation.StyleRes
+import android.support.v4.app.Fragment
 import android.support.v4.graphics.ColorUtils
+import android.support.v4.view.OnApplyWindowInsetsListener
+import android.support.v4.view.WindowInsetsCompat
 import android.support.v7.app.TwilightManagerAccessor
 import android.support.v7.preference.Preference
 import android.support.v7.preference.PreferenceFragmentCompat
@@ -38,24 +42,32 @@ import android.util.AttributeSet
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.WindowManager
+import com.bumptech.glide.Glide
+import com.bumptech.glide.RequestManager
 import com.squareup.otto.Bus
 import nl.komponents.kovenant.Promise
 import org.mariotaku.chameleon.Chameleon
 import org.mariotaku.chameleon.ChameleonActivity
 import org.mariotaku.kpreferences.KPreferences
 import org.mariotaku.kpreferences.get
+import org.mariotaku.ktextension.activityLabel
+import org.mariotaku.ktextension.getSystemWindowInsets
+import org.mariotaku.ktextension.systemWindowInsets
 import org.mariotaku.ktextension.unregisterReceiverSafe
 import org.mariotaku.restfu.http.RestHttpClient
 import org.mariotaku.twidere.BuildConfig
+import org.mariotaku.twidere.R
 import org.mariotaku.twidere.TwidereConstants.SHARED_PREFERENCES_NAME
 import org.mariotaku.twidere.activity.iface.IBaseActivity
 import org.mariotaku.twidere.activity.iface.IControlBarActivity
 import org.mariotaku.twidere.activity.iface.IThemedActivity
-import org.mariotaku.twidere.constant.themeBackgroundAlphaKey
-import org.mariotaku.twidere.constant.themeBackgroundOptionKey
-import org.mariotaku.twidere.constant.themeColorKey
-import org.mariotaku.twidere.constant.themeKey
-import org.mariotaku.twidere.fragment.iface.IBaseFragment.SystemWindowsInsetsCallback
+import org.mariotaku.twidere.annotation.NavbarStyle
+import org.mariotaku.twidere.constant.*
+import org.mariotaku.twidere.extension.defaultSharedPreferences
+import org.mariotaku.twidere.extension.firstLanguage
+import org.mariotaku.twidere.extension.overriding
+import org.mariotaku.twidere.fragment.iface.IBaseFragment.SystemWindowInsetsCallback
 import org.mariotaku.twidere.model.DefaultFeatures
 import org.mariotaku.twidere.preference.iface.IDialogPreference
 import org.mariotaku.twidere.util.*
@@ -66,17 +78,17 @@ import org.mariotaku.twidere.util.premium.ExtraFeaturesService
 import org.mariotaku.twidere.util.schedule.StatusScheduleProvider
 import org.mariotaku.twidere.util.support.ActivitySupport
 import org.mariotaku.twidere.util.support.ActivitySupport.TaskDescriptionCompat
+import org.mariotaku.twidere.util.support.WindowSupport
 import org.mariotaku.twidere.util.sync.TimelineSyncManager
 import org.mariotaku.twidere.util.theme.TwidereAppearanceCreator
 import org.mariotaku.twidere.util.theme.getCurrentThemeResource
-import org.mariotaku.twidere.view.iface.IExtendedView.OnFitSystemWindowsListener
 import java.lang.reflect.InvocationTargetException
 import java.util.*
 import javax.inject.Inject
 
 @SuppressLint("Registered")
 open class BaseActivity : ChameleonActivity(), IBaseActivity<BaseActivity>, IThemedActivity,
-        IControlBarActivity, OnFitSystemWindowsListener, SystemWindowsInsetsCallback,
+        IControlBarActivity, OnApplyWindowInsetsListener, SystemWindowInsetsCallback,
         KeyboardShortcutCallback, OnPreferenceDisplayDialogCallback {
 
     @Inject
@@ -111,6 +123,11 @@ open class BaseActivity : ChameleonActivity(), IBaseActivity<BaseActivity>, IThe
     lateinit var restHttpClient: RestHttpClient
     @Inject
     lateinit var mastodonApplicationRegistry: MastodonApplicationRegistry
+    @Inject
+    lateinit var taskServiceRunner: TaskServiceRunner
+
+    lateinit var requestManager: RequestManager
+        private set
 
     protected val statusScheduleProvider: StatusScheduleProvider?
         get() = statusScheduleProviderFactory.newInstance(this)
@@ -120,6 +137,9 @@ open class BaseActivity : ChameleonActivity(), IBaseActivity<BaseActivity>, IThe
 
     protected val gifShareProvider: GifShareProvider?
         get() = gifShareProviderFactory.newInstance(this)
+
+    protected val isDialogTheme: Boolean
+        get() = ThemeUtils.getBooleanFromAttribute(this, R.attr.isDialogTheme)
 
     override final val currentThemeBackgroundAlpha by lazy {
         themeBackgroundAlpha
@@ -136,9 +156,12 @@ open class BaseActivity : ChameleonActivity(), IBaseActivity<BaseActivity>, IThe
     override val themeBackgroundOption: String
         get() = themePreferences[themeBackgroundOptionKey]
 
+    open val themeNavigationStyle: String
+        get() = themePreferences[navbarStyleKey]
+
     private var isNightBackup: Int = TwilightManagerAccessor.UNSPECIFIED
 
-    private val actionHelper = IBaseActivity.ActionHelper(this)
+    private val actionHelper = IBaseActivity.ActionHelper<BaseActivity>()
 
     private val themePreferences by lazy {
         getSharedPreferences(SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE)
@@ -165,23 +188,25 @@ open class BaseActivity : ChameleonActivity(), IBaseActivity<BaseActivity>, IThe
     }
 
     // Data fields
-    private var systemWindowsInsets: Rect? = null
+    protected var systemWindowsInsets: Rect? = null
+        private set
     var keyMetaState: Int = 0
         private set
 
-    override fun getSystemWindowsInsets(insets: Rect): Boolean {
+    override fun getSystemWindowInsets(caller: Fragment, insets: Rect): Boolean {
         if (systemWindowsInsets == null) return false
         insets.set(systemWindowsInsets)
         return true
     }
 
-    override fun onFitSystemWindows(insets: Rect) {
-        if (systemWindowsInsets == null)
-            systemWindowsInsets = Rect(insets)
-        else {
-            systemWindowsInsets!!.set(insets)
+    override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
+        if (systemWindowsInsets == null) {
+            systemWindowsInsets = insets.systemWindowInsets
+        } else {
+            insets.getSystemWindowInsets(systemWindowsInsets!!)
         }
         notifyControlBarOffsetChanged()
+        return insets
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -226,15 +251,33 @@ open class BaseActivity : ChameleonActivity(), IBaseActivity<BaseActivity>, IThe
             StrictModeUtils.detectAllVmPolicy()
             StrictModeUtils.detectAllThreadPolicy()
         }
-        val prefs = getSharedPreferences(SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE)
-        val themeResource = getThemeResource(prefs, prefs[themeKey], prefs[themeColorKey])
+        val themeColor = themePreferences[themeColorKey]
+        val themeResource = getThemeResource(themePreferences, themePreferences[themeKey], themeColor)
         if (themeResource != 0) {
             setTheme(themeResource)
         }
+        onApplyNavigationStyle(themeNavigationStyle, themeColor)
         super.onCreate(savedInstanceState)
+        title = activityLabel
+        requestManager = Glide.with(this)
         ActivitySupport.setTaskDescription(this, TaskDescriptionCompat(title.toString(), null,
                 ColorUtils.setAlphaComponent(overrideTheme.colorToolbar, 0xFF)))
         GeneralComponent.get(this).inject(this)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        requestManager.onStart()
+    }
+
+    override fun onStop() {
+        requestManager.onStop()
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        requestManager.onDestroy()
+        super.onDestroy()
     }
 
     override fun onResume() {
@@ -305,11 +348,21 @@ open class BaseActivity : ChameleonActivity(), IBaseActivity<BaseActivity>, IThe
 
     override fun onResumeFragments() {
         super.onResumeFragments()
-        actionHelper.dispatchOnResumeFragments()
+        actionHelper.dispatchOnResumeFragments(this)
+    }
+
+    override fun attachBaseContext(newBase: Context) {
+        val locale = newBase.defaultSharedPreferences[overrideLanguageKey] ?: Resources.getSystem()
+                .firstLanguage
+        if (locale == null) {
+            super.attachBaseContext(newBase)
+            return
+        }
+        super.attachBaseContext(newBase.overriding(locale))
     }
 
     override fun executeAfterFragmentResumed(useHandler: Boolean, action: (BaseActivity) -> Unit): Promise<Unit, Exception> {
-        return actionHelper.executeAfterFragmentResumed(useHandler, action)
+        return actionHelper.executeAfterFragmentResumed(this, useHandler, action)
     }
 
 
@@ -369,6 +422,18 @@ open class BaseActivity : ChameleonActivity(), IBaseActivity<BaseActivity>, IThe
     @StyleRes
     protected open fun getThemeResource(preferences: SharedPreferences, theme: String, themeColor: Int): Int {
         return getCurrentThemeResource(this, theme)
+    }
+
+    private fun onApplyNavigationStyle(navbarStyle: String, themeColor: Int) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP || isDialogTheme) return
+        when (navbarStyle) {
+            NavbarStyle.TRANSPARENT -> {
+                window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
+            }
+            NavbarStyle.COLORED -> {
+                WindowSupport.setNavigationBarColor(window, themeColor)
+            }
+        }
     }
 
     private fun findClass(name: String): Class<*>? {
